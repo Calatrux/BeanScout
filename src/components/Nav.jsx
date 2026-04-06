@@ -90,6 +90,15 @@ export default function Nav() {
               </>
             )}
 
+            {user && profile?.is_admin && (
+              <Link
+                href="/admin"
+                className={`nav-link${pathname === '/admin' ? ' active' : ''}`}
+              >
+                Analysis
+              </Link>
+            )}
+
             {!loading && (
               <>
                 {user ? (
@@ -189,6 +198,15 @@ export default function Nav() {
                   Picklist
                 </Link>
               </>
+            )}
+
+            {user && profile?.is_admin && (
+              <Link
+                href="/admin"
+                className={`mobile-menu-link${pathname === '/admin' ? ' active' : ''}`}
+              >
+                Analysis
+              </Link>
             )}
 
             {!loading && user && (

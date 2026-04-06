@@ -8,7 +8,7 @@ import { getCachedEventData, cacheEventData } from '@/lib/tba-cache'
 import { useAuth } from '@/lib/auth-context'
 
 function makeTeams(numbers) {
-  return numbers.map((num) => ({ number: num, notes: '' }))
+  return numbers.map((num) => ({ number: num, notes: '', noShow: false, incap: false }))
 }
 
 export default function QualScoutForm() {
@@ -152,6 +152,10 @@ export default function QualScoutForm() {
     setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, notes: value } : t)))
   }
 
+  const updateTeamFlag = (index, field, value) => {
+    setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)))
+  }
+
   // Drag and drop handlers
   const handleDragStart = (e, index) => {
     setDraggedIndex(index)
@@ -253,10 +257,16 @@ export default function QualScoutForm() {
         alliance,
         team1_number: teams[0].number,
         team1_notes: teams[0].notes,
+        team1_no_show: teams[0].noShow,
+        team1_incap: teams[0].incap,
         team2_number: teams[1].number,
         team2_notes: teams[1].notes,
+        team2_no_show: teams[1].noShow,
+        team2_incap: teams[1].incap,
         team3_number: teams[2].number,
         team3_notes: teams[2].notes,
+        team3_no_show: teams[2].noShow,
+        team3_incap: teams[2].incap,
         scouter_name: scouterName,
         created_at: new Date().toISOString(),
         synced: false,
@@ -317,7 +327,14 @@ export default function QualScoutForm() {
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>
-      <h1 className="form-title">Qual Match Scouting</h1>
+      <div className="form-header-with-scouter">
+        <h1 className="form-title">Qual Match Scouting</h1>
+        {scouterName && (
+          <div className="scouter-display">
+            Scouting as <strong>{scouterName}</strong>
+          </div>
+        )}
+      </div>
 
       {/* Event Key */}
       <div className="field">
@@ -430,6 +447,24 @@ export default function QualScoutForm() {
                 </span>
                 <span className={`rank-badge rank-${index + 1}`}>#{index + 1}</span>
                 <span className="team-number">{team.number}</span>
+                <div className="team-status-buttons">
+                  <button
+                    type="button"
+                    className={`status-toggle-btn${team.noShow ? ' active' : ''}`}
+                    onClick={() => updateTeamFlag(index, 'noShow', !team.noShow)}
+                    aria-label={`Toggle no-show for team ${team.number}`}
+                  >
+                    No-Show
+                  </button>
+                  <button
+                    type="button"
+                    className={`status-toggle-btn${team.incap ? ' active' : ''}`}
+                    onClick={() => updateTeamFlag(index, 'incap', !team.incap)}
+                    aria-label={`Toggle incap for team ${team.number}`}
+                  >
+                    Incap
+                  </button>
+                </div>
                 <div className="move-buttons">
                   <button
                     type="button"
@@ -460,13 +495,6 @@ export default function QualScoutForm() {
               />
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Scouter display (read-only) */}
-      {scouterName && (
-        <div className="scouter-display">
-          Scouting as <strong>{scouterName}</strong>
         </div>
       )}
 

@@ -656,7 +656,36 @@ button { cursor: pointer; font-family: inherit; }
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--text);
-  flex: 1;
+}
+
+.team-status-buttons {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.status-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.status-toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.status-toggle-btn.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: white;
 }
 
 .move-buttons {
@@ -724,6 +753,27 @@ button { cursor: pointer; font-family: inherit; }
 .scouter-display strong {
   color: var(--text);
   font-weight: 600;
+}
+
+.form-header-with-scouter {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.form-header-with-scouter .form-title {
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.form-header-with-scouter .scouter-display {
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.8125rem;
+  background: none;
+  border: none;
+  padding: 0;
 }
 
 /* Team search dropdown */
@@ -1939,5 +1989,704 @@ button { cursor: pointer; font-family: inherit; }
 
   .modal {
     padding: 20px;
+  }
+}
+
+/* ============================================
+   ADMIN ANALYSIS DASHBOARD STYLES
+   ============================================ */
+
+.analysis-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.analysis-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+/* Analysis tabs */
+.analysis-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.analysis-tab {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analysis-tab:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.analysis-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* Empty state */
+.analysis-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-dim);
+}
+
+.analysis-empty p {
+  margin: 8px 0;
+}
+
+.analysis-empty .hint {
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Rankings tab */
+.rankings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rankings-count {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.rankings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Team row (expandable) */
+.analysis-team-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.analysis-team-row:hover {
+  border-color: var(--accent);
+}
+
+.analysis-team-row.expanded {
+  border-color: var(--accent);
+}
+
+.analysis-team-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.analysis-team-rank {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  min-width: 48px;
+  text-align: center;
+}
+
+.analysis-team-rank.top-3 {
+  color: var(--green);
+  border-color: rgba(34,197,94,0.3);
+  background: rgba(34,197,94,0.1);
+}
+
+.analysis-team-number {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 60px;
+}
+
+.analysis-team-name {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-team-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.analysis-team-avg {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.analysis-team-count {
+  color: var(--text-dim);
+}
+
+.expand-icon {
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+
+.analysis-team-row.expanded .expand-icon {
+  transform: rotate(180deg);
+}
+
+/* Expanded content */
+.analysis-team-content {
+  border-top: 1px solid var(--border);
+  padding: 16px;
+  background: var(--bg-input);
+}
+
+.notes-section {
+  margin-bottom: 20px;
+}
+
+.notes-section:last-child {
+  margin-bottom: 0;
+}
+
+.notes-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notes-section-count {
+  font-size: 0.6875rem;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+/* Individual note card */
+.note-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.note-card:last-child {
+  margin-bottom: 0;
+}
+
+.note-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.note-card-rank {
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-input);
+}
+
+.note-card-rank.rank-1 {
+  color: var(--green);
+  background: rgba(34,197,94,0.1);
+}
+
+.note-card-rank.rank-2 {
+  color: var(--yellow);
+  background: rgba(234,179,8,0.1);
+}
+
+.note-card-rank.rank-3 {
+  color: var(--text-muted);
+}
+
+.note-card-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.alliance-badge {
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+}
+
+.alliance-badge.red {
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.alliance-badge.blue {
+  color: var(--blue);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.flag-badge {
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+}
+
+.flag-badge.no-show {
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.flag-badge.incap {
+  color: var(--yellow);
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.note-card-text {
+  font-size: 0.875rem;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.note-card-text.empty {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.note-card-footer {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Team notes specific */
+.note-card.is-update {
+  border-left: 3px solid var(--accent);
+}
+
+.update-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Empty state within sections */
+.notes-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Picklists tab - Team search */
+.team-search-section {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.team-search-section label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.team-search-wrapper {
+  position: relative;
+}
+
+.team-search-wrapper input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+}
+
+.team-search-wrapper input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.team-search-wrapper input::placeholder {
+  color: var(--text-dim);
+}
+
+.team-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 10;
+  margin-top: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.team-search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+  text-align: left;
+}
+
+.team-search-item:last-child {
+  border-bottom: none;
+}
+
+.team-search-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.team-search-number {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 50px;
+}
+
+.team-search-name {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Picklist teams list */
+.picklist-teams-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.picklist-view-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s, background 0.15s;
+  cursor: default;
+}
+
+.picklist-view-row.dragging {
+  opacity: 0.5;
+  border-color: var(--accent);
+}
+
+.picklist-view-row .drag-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.picklist-view-row .drag-handle:hover {
+  color: var(--text-muted);
+}
+
+.picklist-team-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.team-action-btn {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 6px 10px;
+  transition: background 0.1s, color 0.1s;
+  cursor: pointer;
+}
+
+.team-action-btn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text);
+}
+
+.team-action-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.team-action-btn.remove {
+  color: var(--red);
+}
+
+.team-action-btn.remove:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Picklist notes section */
+.picklist-notes-section label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.note-input-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.note-input-wrapper textarea {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  padding: 12px 14px;
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  line-height: 1.5;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.note-input-wrapper textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.add-note-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.add-note-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.add-note-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.delete-note-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--red);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.delete-note-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Picklists tab */
+.scouter-select {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scouter-select label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.scouter-select select {
+  flex: 1;
+  max-width: 300px;
+}
+
+/* Picklist view (read-only) */
+.picklist-view {
+  margin-top: 16px;
+}
+
+.picklist-view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.picklist-view-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.picklist-view-meta {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+
+.picklist-view-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.picklist-view-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.picklist-view-number {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 50px;
+}
+
+.picklist-view-name {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.picklist-view-notes {
+  margin-top: 24px;
+}
+
+/* Mobile adjustments for analysis dashboard */
+@media (max-width: 767px) {
+  .analysis-container {
+    padding: 16px;
+  }
+
+  .analysis-team-name {
+    display: none;
+  }
+
+  .analysis-team-stats {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .analysis-tabs {
+    flex-wrap: wrap;
+  }
+
+  .scouter-select {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .scouter-select select {
+    max-width: none;
+  }
+
+  .note-card-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

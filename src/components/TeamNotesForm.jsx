@@ -233,7 +233,14 @@ export default function TeamNotesForm() {
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>
-      <h1 className="form-title">Team Note</h1>
+      <div className="form-header-with-scouter">
+        <h1 className="form-title">Team Note</h1>
+        {scouterName && (
+          <div className="scouter-display">
+            Scouting as <strong>{scouterName}</strong>
+          </div>
+        )}
+      </div>
 
       {/* Event key */}
       <div className="field">
@@ -357,13 +364,6 @@ export default function TeamNotesForm() {
           </div>
         </div>
       </div>
-
-      {/* Scouter display (read-only) */}
-      {scouterName && (
-        <div className="scouter-display">
-          Scouting as <strong>{scouterName}</strong>
-        </div>
-      )}
 
       {status && (
         <div className={`status ${status.type}`}>{status.message}</div>
