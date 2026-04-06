@@ -266,24 +266,37 @@ export default function QualScoutForm() {
       // Always write to IndexedDB first
       await saveQualEntry(entry)
       console.log('[QualScout] Entry saved to IndexedDB successfully')
-      window.dispatchEvent(new Event('beanscout:saved'))
 
       console.log('[QualScout] Attempting Supabase sync...')
-      // Attempt Supabase sync
+      // Attempt Supabase sync with timeout
       const { synced: _s, ...supabaseRecord } = entry
-      const { error } = await supabase.from('qual_scouting').insert(supabaseRecord)
+      try {
+        const syncPromise = supabase.from('qual_scouting').insert(supabaseRecord)
+        const { error } = await Promise.race([
+          syncPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 5000))
+        ])
 
-      if (error) {
-        console.log('[QualScout] Supabase sync failed:', error.message)
+        if (error) {
+          console.log('[QualScout] Supabase sync failed:', error.message)
+          window.dispatchEvent(new Event('beanscout:saved'))
+          setStatus({
+            type: 'warning',
+            message: `Saved locally. Will sync when online. (${error.message})`,
+          })
+        } else {
+          console.log('[QualScout] Supabase sync successful')
+          await markQualEntrySynced(id)
+          window.dispatchEvent(new Event('beanscout:saved'))
+          setStatus({ type: 'success', message: `Match ${matchNum} (${alliance}) saved and synced.` })
+        }
+      } catch (syncErr) {
+        console.log('[QualScout] Supabase sync timed out or failed:', syncErr.message)
+        window.dispatchEvent(new Event('beanscout:saved'))
         setStatus({
           type: 'warning',
-          message: `Saved locally. Will sync when online. (${error.message})`,
+          message: 'Saved locally. Will sync when online.',
         })
-      } else {
-        console.log('[QualScout] Supabase sync successful')
-        await markQualEntrySynced(id)
-        window.dispatchEvent(new Event('beanscout:saved'))
-        setStatus({ type: 'success', message: `Match ${matchNum} (${alliance}) saved and synced.` })
       }
 
       // Advance to next match, reset team notes

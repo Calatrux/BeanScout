@@ -332,6 +332,11 @@ button { cursor: pointer; font-family: inherit; }
   background: rgba(234, 179, 8, 0.25);
 }
 
+.sync-error {
+  color: #e53e3e;
+  font-weight: 500;
+}
+
 /* Page wrapper */
 .page {
   padding: 40px 0 80px;
@@ -1135,16 +1140,16 @@ button { cursor: pointer; font-family: inherit; }
     min-height: 50px;
   }
 
-  /* Alliance toggle - Stack vertically */
+  /* Alliance toggle - Keep horizontal on mobile */
   .alliance-toggle {
-    flex-direction: column;
-    gap: 8px;
+    width: 100%;
   }
 
   .alliance-btn {
-    width: 100%;
+    flex: 1;
     min-height: 48px;
     font-size: 1rem;
+    padding: 10px 16px;
   }
 
   /* Team cards - More spacing, easier to drag */
@@ -1463,5 +1468,476 @@ button { cursor: pointer; font-family: inherit; }
   .teams-section {
     max-height: 60vh;
     overflow-y: auto;
+  }
+}
+
+/* ============================================
+   PICKLIST STYLES
+   ============================================ */
+
+.picklist-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.picklist-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.picklist-header .form-title {
+  margin-bottom: 0;
+}
+
+.picklist-tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 16px 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.picklist-tabs-scroll {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.picklist-tab {
+  padding: 8px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.picklist-tab:hover {
+  border-color: var(--accent);
+  background: rgba(27, 151, 173, 0.1);
+}
+
+.picklist-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.picklist-tab-add {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.picklist-tab-add:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.picklist-tab-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--border);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: #1a1d21;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.modal h2 {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+/* Picklist content */
+.picklist-content {
+  margin-top: 20px;
+}
+
+.picklist-name-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.picklist-name {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.picklist-name:hover .edit-icon {
+  opacity: 1;
+}
+
+.edit-icon {
+  font-size: 0.875rem;
+  opacity: 0.3;
+  transition: opacity 0.15s;
+}
+
+.picklist-name-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.delete-picklist-btn {
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.delete-picklist-btn:hover {
+  border-color: #e53e3e;
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.1);
+}
+
+/* Picklist teams */
+.picklist-teams {
+  margin-top: 16px;
+}
+
+.picklist-teams-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.picklist-team-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: grab;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.picklist-team-row:hover {
+  border-color: var(--accent);
+}
+
+.picklist-team-row.dragging {
+  opacity: 0.5;
+  border-color: var(--accent);
+  background: rgba(27, 151, 173, 0.1);
+}
+
+.picklist-team-row:active {
+  cursor: grabbing;
+}
+
+.picklist-team-number {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--text);
+  min-width: 60px;
+}
+
+.picklist-team-name {
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picklist-team-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.remove-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.remove-btn:hover {
+  border-color: #e53e3e;
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.1);
+}
+
+.picklist-empty {
+  text-align: center;
+  padding: 40px 20px;
+  background: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  margin-top: 20px;
+}
+
+.picklist-empty p {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.picklist-empty .hint {
+  font-size: 0.875rem;
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+/* Notes section */
+.picklist-notes-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.picklist-notes-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.picklist-new-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.picklist-new-note textarea {
+  width: 100%;
+  padding: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.875rem;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.picklist-new-note textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.add-note-btn {
+  align-self: flex-end;
+  padding: 10px 20px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.add-note-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.add-note-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.picklist-notes-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.picklist-note {
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.picklist-note-text {
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.picklist-note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.picklist-note-time {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.delete-note-btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.delete-note-btn:hover {
+  border-color: #e53e3e;
+  color: #e53e3e;
+}
+
+/* Saving indicator */
+.saving-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  margin-top: 16px;
+}
+
+.loading-spinner.small {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+/* Mobile adjustments for picklist */
+@media (max-width: 767px) {
+  .picklist-container {
+    padding: 16px;
+  }
+
+  .picklist-team-name {
+    display: none;
+  }
+
+  .picklist-team-number {
+    min-width: 50px;
+  }
+
+  .picklist-tabs {
+    margin: 12px 0;
+  }
+
+  .picklist-tab {
+    padding: 6px 12px;
+    font-size: 0.8125rem;
+  }
+
+  .picklist-name {
+    font-size: 1.25rem;
+  }
+
+  .modal {
+    padding: 20px;
   }
 }

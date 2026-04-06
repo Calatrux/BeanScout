@@ -1,7 +1,7 @@
 import { openDB } from 'idb'
 
 const DB_NAME = 'beanscout'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const OPERATION_TIMEOUT = 10000 // 10 seconds timeout for database operations
 
 let dbPromise = null
@@ -48,6 +48,15 @@ async function getDB() {
           if (!db.objectStoreNames.contains('tba_cache')) {
             console.log('[IndexedDB] Creating tba_cache store')
             db.createObjectStore('tba_cache', { keyPath: 'event_key' })
+          }
+        }
+        if (oldVersion < 3) {
+          if (!db.objectStoreNames.contains('picklists')) {
+            console.log('[IndexedDB] Creating picklists store')
+            const store = db.createObjectStore('picklists', { keyPath: 'id' })
+            store.createIndex('by_synced', 'synced')
+            store.createIndex('by_scouter', 'scouter_name')
+            store.createIndex('by_event', 'event_key')
           }
         }
         console.log('[IndexedDB] Upgrade complete')
@@ -133,12 +142,14 @@ export async function saveTeamNote(note) {
 
 export async function getUnsyncedQualEntries() {
   const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for unsynced qual entries')
-  return withTimeout(db.getAllFromIndex('qual_scouting', 'by_synced', false), OPERATION_TIMEOUT, 'get unsynced qual entries')
+  const allEntries = await withTimeout(db.getAll('qual_scouting'), OPERATION_TIMEOUT, 'get all qual entries')
+  return allEntries.filter(entry => !entry.synced)
 }
 
 export async function getUnsyncedTeamNotes() {
   const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for unsynced team notes')
-  return withTimeout(db.getAllFromIndex('team_notes', 'by_synced', false), OPERATION_TIMEOUT, 'get unsynced team notes')
+  const allNotes = await withTimeout(db.getAll('team_notes'), OPERATION_TIMEOUT, 'get all team notes')
+  return allNotes.filter(note => !note.synced)
 }
 
 export async function markQualEntrySynced(id) {
@@ -154,9 +165,55 @@ export async function markTeamNoteSynced(id) {
 }
 
 export async function getUnsyncedCount() {
-  const [qual, notes] = await Promise.all([
+  const [qual, notes, picklists] = await Promise.all([
     getUnsyncedQualEntries(),
     getUnsyncedTeamNotes(),
+    getUnsyncedPicklists(),
   ])
-  return qual.length + notes.length
+  return qual.length + notes.length + picklists.length
+}
+
+// Picklist functions
+export async function savePicklist(picklist) {
+  console.log('[IndexedDB] Saving picklist:', picklist.id)
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for picklist save')
+  return withTimeout(db.put('picklists', picklist), OPERATION_TIMEOUT, 'save picklist')
+}
+
+export async function getPicklist(id) {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for get picklist')
+  return withTimeout(db.get('picklists', id), OPERATION_TIMEOUT, 'get picklist')
+}
+
+export async function deletePicklist(id) {
+  console.log('[IndexedDB] Deleting picklist:', id)
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for delete picklist')
+  return withTimeout(db.delete('picklists', id), OPERATION_TIMEOUT, 'delete picklist')
+}
+
+export async function getPicklistsByScouter(scouterName) {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for get picklists by scouter')
+  return withTimeout(db.getAllFromIndex('picklists', 'by_scouter', scouterName), OPERATION_TIMEOUT, 'get picklists by scouter')
+}
+
+export async function getPicklistsByEvent(eventKey) {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for get picklists by event')
+  return withTimeout(db.getAllFromIndex('picklists', 'by_event', eventKey), OPERATION_TIMEOUT, 'get picklists by event')
+}
+
+export async function getUnsyncedPicklists() {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for unsynced picklists')
+  const allPicklists = await withTimeout(db.getAll('picklists'), OPERATION_TIMEOUT, 'get all picklists')
+  return allPicklists.filter(picklist => !picklist.synced)
+}
+
+export async function markPicklistSynced(id) {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for mark picklist synced')
+  const picklist = await withTimeout(db.get('picklists', id), OPERATION_TIMEOUT, 'get picklist for sync mark')
+  if (picklist) await withTimeout(db.put('picklists', { ...picklist, synced: true }), OPERATION_TIMEOUT, 'mark picklist synced')
+}
+
+export async function getAllPicklists() {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for get all picklists')
+  return withTimeout(db.getAll('picklists'), OPERATION_TIMEOUT, 'get all picklists')
 }

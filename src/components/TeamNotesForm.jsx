@@ -179,25 +179,38 @@ export default function TeamNotesForm() {
       console.log('[TeamNotes] Saving entry to IndexedDB...')
       await saveTeamNote(entry)
       console.log('[TeamNotes] Entry saved to IndexedDB successfully')
-      window.dispatchEvent(new Event('beanscout:saved'))
 
       console.log('[TeamNotes] Attempting Supabase sync...')
       const { synced: _s, ...supabaseRecord } = entry
-      const { error } = await supabase.from('team_notes').insert(supabaseRecord)
+      try {
+        const syncPromise = supabase.from('team_notes').insert(supabaseRecord)
+        const { error } = await Promise.race([
+          syncPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 5000))
+        ])
 
-      if (error) {
-        console.log('[TeamNotes] Supabase sync failed:', error.message)
-        setStatus({
-          type: 'warning',
-          message: `Saved locally. Will sync when online. (${error.message})`,
-        })
-      } else {
-        console.log('[TeamNotes] Supabase sync successful')
-        await markTeamNoteSynced(id)
+        if (error) {
+          console.log('[TeamNotes] Supabase sync failed:', error.message)
+          window.dispatchEvent(new Event('beanscout:saved'))
+          setStatus({
+            type: 'warning',
+            message: `Saved locally. Will sync when online. (${error.message})`,
+          })
+        } else {
+          console.log('[TeamNotes] Supabase sync successful')
+          await markTeamNoteSynced(id)
+          window.dispatchEvent(new Event('beanscout:saved'))
+          setStatus({
+            type: 'success',
+            message: `Note for team ${selectedTeam.number} saved and synced.${isUpdate ? ' (Marked as update)' : ''}`,
+          })
+        }
+      } catch (syncErr) {
+        console.log('[TeamNotes] Supabase sync timed out or failed:', syncErr.message)
         window.dispatchEvent(new Event('beanscout:saved'))
         setStatus({
-          type: 'success',
-          message: `Note for team ${selectedTeam.number} saved and synced.${isUpdate ? ' (Marked as update)' : ''}`,
+          type: 'warning',
+          message: 'Saved locally. Will sync when online.',
         })
       }
 
