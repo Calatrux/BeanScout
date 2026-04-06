@@ -7,4 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase env vars not set. Remote sync will be unavailable.')
 }
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '')
+// Provide safe defaults for build time when env vars might not be available
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
+)

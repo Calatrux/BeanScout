@@ -25,6 +25,9 @@ export default function SyncBanner() {
   }, [])
 
   useEffect(() => {
+    // Skip during server-side rendering or build time
+    if (typeof window === 'undefined') return
+
     // Make this non-blocking - don't wait for it to complete before rendering
     refreshCount()
 

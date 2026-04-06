@@ -5,7 +5,7 @@
 const DEBUG_ENABLED = true
 
 export function debugLog(component, message, data = null) {
-  if (!DEBUG_ENABLED) return
+  if (!DEBUG_ENABLED || typeof window === 'undefined') return
 
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0]
   const logMessage = `[${timestamp}] [${component}] ${message}`
@@ -18,7 +18,7 @@ export function debugLog(component, message, data = null) {
 }
 
 export function debugTimeStart(component, operation) {
-  if (!DEBUG_ENABLED) return
+  if (!DEBUG_ENABLED || typeof window === 'undefined') return
 
   const key = `${component}-${operation}`
   console.time(`[DEBUG] ${key}`)
@@ -26,7 +26,7 @@ export function debugTimeStart(component, operation) {
 }
 
 export function debugTimeEnd(key) {
-  if (!DEBUG_ENABLED) return
+  if (!DEBUG_ENABLED || typeof window === 'undefined') return
 
   console.timeEnd(`[DEBUG] ${key}`)
 }

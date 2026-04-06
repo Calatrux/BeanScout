@@ -17,6 +17,9 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Skip auth initialization during build time
+    if (typeof window === 'undefined') return
+
     debugLog('AuthProvider', 'Starting auth initialization')
 
     // Get initial session
