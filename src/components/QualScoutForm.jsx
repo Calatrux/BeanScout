@@ -7,8 +7,36 @@ import { getEventMatches, getEventInfo, getEventTeams } from '@/lib/tba'
 import { getCachedEventData, cacheEventData } from '@/lib/tba-cache'
 import { useAuth } from '@/lib/auth-context'
 
+// Characterization tags organized by category
+const CHARACTERIZATION_TAGS = {
+  offense: [
+    'High BPS Shooter',
+    'Accurate Scorer',
+    'Fast Cycling',
+    'High Capacity',
+    'Inaccurate Scorer',
+    'Slow Cycling'
+  ],
+  defense: [
+    'Aggressive Defender',
+    'Shutdown Defense',
+    'Weak Defense'
+  ],
+  mobility: [
+    'Agile Maneuvering',
+    'Slow Moving',
+    'Good Driver',
+    'Poor Driver'
+  ],
+  reliability: [
+    'Very Reliable',
+    'Breakdown Prone',
+    'Inconsistent'
+  ]
+}
+
 function makeTeams(numbers) {
-  return numbers.map((num) => ({ number: num, notes: '', noShow: false, incap: false }))
+  return numbers.map((num) => ({ number: num, notes: '', noShow: false, incap: false, tags: [] }))
 }
 
 export default function QualScoutForm() {
@@ -32,6 +60,9 @@ export default function QualScoutForm() {
   const [draggedIndex, setDraggedIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const dragRef = useRef(null)
+
+  // Tag category state
+  const [expandedTagCategory, setExpandedTagCategory] = useState(null)
 
   // Get scouter name from profile
   const scouterName = profile
@@ -156,6 +187,22 @@ export default function QualScoutForm() {
     setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)))
   }
 
+  const toggleTag = (teamIndex, tag) => {
+    setTeams((prev) => prev.map((team, i) => {
+      if (i !== teamIndex) return team
+      const currentTags = team.tags || []
+      const hasTag = currentTags.includes(tag)
+      const newTags = hasTag
+        ? currentTags.filter(t => t !== tag)
+        : [...currentTags, tag]
+      return { ...team, tags: newTags }
+    }))
+  }
+
+  const toggleTagCategory = (category) => {
+    setExpandedTagCategory(expandedTagCategory === category ? null : category)
+  }
+
   // Drag and drop handlers
   const handleDragStart = (e, index) => {
     setDraggedIndex(index)
@@ -259,14 +306,17 @@ export default function QualScoutForm() {
         team1_notes: teams[0].notes,
         team1_no_show: teams[0].noShow,
         team1_incap: teams[0].incap,
+        team1_tags: teams[0].tags || [],
         team2_number: teams[1].number,
         team2_notes: teams[1].notes,
         team2_no_show: teams[1].noShow,
         team2_incap: teams[1].incap,
+        team2_tags: teams[1].tags || [],
         team3_number: teams[2].number,
         team3_notes: teams[2].notes,
         team3_no_show: teams[2].noShow,
         team3_incap: teams[2].incap,
+        team3_tags: teams[2].tags || [],
         scouter_name: scouterName,
         created_at: new Date().toISOString(),
         synced: false,
@@ -493,6 +543,71 @@ export default function QualScoutForm() {
                 placeholder={`Why rank #${index + 1}? What did team ${team.number} do?`}
                 rows={3}
               />
+
+              {/* Characterization Tags */}
+              <div className="team-tags-section">
+                <label className="tags-label">Quick Tags</label>
+                <div className="tags-container">
+                  {Object.entries(CHARACTERIZATION_TAGS).map(([category, tags]) => {
+                    const selectedTags = (team.tags || []).filter(tag => tags.includes(tag))
+                    const isExpanded = expandedTagCategory === category
+
+                    return (
+                      <div key={category} className="tag-category">
+                        <button
+                          type="button"
+                          className={`tag-category-header${isExpanded ? ' expanded' : ''}${selectedTags.length > 0 ? ' has-selected' : ''}`}
+                          onClick={() => toggleTagCategory(category)}
+                        >
+                          <span className="tag-category-label">
+                            {category.charAt(0).toUpperCase() + category.slice(1)}
+                          </span>
+                          {selectedTags.length > 0 && (
+                            <span className="tag-category-count">({selectedTags.length})</span>
+                          )}
+                          <span className="tag-category-icon">
+                            {isExpanded ? '−' : '+'}
+                          </span>
+                        </button>
+
+                        {/* Show selected tags when collapsed */}
+                        {!isExpanded && selectedTags.length > 0 && (
+                          <div className="tag-buttons-preview">
+                            {selectedTags.map(tag => (
+                              <button
+                                key={tag}
+                                type="button"
+                                className="tag-btn active preview"
+                                onClick={() => toggleTag(index, tag)}
+                                title={`Remove ${tag}`}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Show all tags when expanded */}
+                        {isExpanded && (
+                          <div className="tag-buttons">
+                            {tags.map(tag => (
+                              <button
+                                key={tag}
+                                type="button"
+                                className={`tag-btn${(team.tags || []).includes(tag) ? ' active' : ''}`}
+                                onClick={() => toggleTag(index, tag)}
+                                title={tag}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           ))}
         </div>

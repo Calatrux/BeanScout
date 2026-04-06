@@ -28,6 +28,12 @@ export default function AnalysisDashboard() {
   // Rankings tab state
   const [expandedTeam, setExpandedTeam] = useState(null)
 
+  // Filtering and sorting state
+  const [selectedTags, setSelectedTags] = useState([])
+  const [sortMethod, setSortMethod] = useState('avgRank')
+  const [sortDirection, setSortDirection] = useState('asc')
+  const [showFilters, setShowFilters] = useState(false)
+
   // Team picklist management state
   const [teamPicklists, setTeamPicklists] = useState([])
   const [activePicklistId, setActivePicklistId] = useState(null)
@@ -209,18 +215,19 @@ export default function AnalysisDashboard() {
         rankSum: 0,
         rankCount: 0,
         rankings: [],
+        tagCounts: {},
       }
     })
 
     // Process qual scouting entries
     qualData.forEach(entry => {
       const teams = [
-        { number: entry.team1_number, notes: entry.team1_notes, rank: 1, noShow: entry.team1_no_show, incap: entry.team1_incap },
-        { number: entry.team2_number, notes: entry.team2_notes, rank: 2, noShow: entry.team2_no_show, incap: entry.team2_incap },
-        { number: entry.team3_number, notes: entry.team3_notes, rank: 3, noShow: entry.team3_no_show, incap: entry.team3_incap },
+        { number: entry.team1_number, notes: entry.team1_notes, rank: 1, noShow: entry.team1_no_show, incap: entry.team1_incap, tags: entry.team1_tags },
+        { number: entry.team2_number, notes: entry.team2_notes, rank: 2, noShow: entry.team2_no_show, incap: entry.team2_incap, tags: entry.team2_tags },
+        { number: entry.team3_number, notes: entry.team3_notes, rank: 3, noShow: entry.team3_no_show, incap: entry.team3_incap, tags: entry.team3_tags },
       ]
 
-      teams.forEach(({ number, notes, rank, noShow, incap }) => {
+      teams.forEach(({ number, notes, rank, noShow, incap, tags }) => {
         if (teamStats[number]) {
           teamStats[number].rankSum += rank
           teamStats[number].rankCount += 1
@@ -233,20 +240,75 @@ export default function AnalysisDashboard() {
             createdAt: entry.created_at,
             noShow: noShow || false,
             incap: incap || false,
+            tags: tags || [],
           })
+
+          // Count tags for aggregation
+          if (tags && Array.isArray(tags)) {
+            tags.forEach(tag => {
+              teamStats[number].tagCounts[tag] = (teamStats[number].tagCounts[tag] || 0) + 1
+            })
+          }
         }
       })
     })
 
     // Calculate averages and filter to teams with data
-    return Object.values(teamStats)
+    let teams = Object.values(teamStats)
       .filter(team => team.rankCount > 0)
       .map(team => ({
         ...team,
         avgRank: team.rankSum / team.rankCount,
       }))
-      .sort((a, b) => a.avgRank - b.avgRank)
-  }, [qualData, eventTeams])
+
+    // Apply tag filtering
+    if (selectedTags.length > 0) {
+      teams = teams.filter(team => {
+        return selectedTags.every(selectedTag =>
+          Object.keys(team.tagCounts).includes(selectedTag)
+        )
+      })
+    }
+
+    // Apply sorting
+    teams.sort((a, b) => {
+      let comparison = 0
+
+      switch (sortMethod) {
+        case 'avgRank':
+          comparison = a.avgRank - b.avgRank
+          break
+        case 'observations':
+          comparison = b.rankCount - a.rankCount
+          break
+        case 'teamNumber':
+          comparison = a.number - b.number
+          break
+        case 'teamName':
+          comparison = (a.name || '').localeCompare(b.name || '')
+          break
+        default:
+          comparison = a.avgRank - b.avgRank
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+
+    return teams
+  }, [qualData, eventTeams, selectedTags, sortMethod, sortDirection])
+
+  // Compute available tags for filtering
+  const availableTags = useMemo(() => {
+    const tagSet = new Set()
+    qualData.forEach(entry => {
+      [entry.team1_tags, entry.team2_tags, entry.team3_tags].forEach(tags => {
+        if (tags && Array.isArray(tags)) {
+          tags.forEach(tag => tagSet.add(tag))
+        }
+      })
+    })
+    return Array.from(tagSet).sort()
+  }, [qualData])
 
   // Get team notes for a specific team
   const getTeamNotes = (teamNumber) => {
@@ -612,9 +674,104 @@ export default function AnalysisDashboard() {
                   ) : (
                     <>
                       <div className="rankings-header">
-                        <span className="rankings-count">
-                          {teamRankings.length} teams ranked | {qualData.length} observations
-                        </span>
+                        <div className="rankings-count-and-controls">
+                          <span className="rankings-count">
+                            {teamRankings.length} teams ranked | {qualData.length} observations
+                          </span>
+                          <button
+                            type="button"
+                            className={`filter-toggle-btn${showFilters ? ' active' : ''}`}
+                            onClick={() => setShowFilters(!showFilters)}
+                            title="Show/hide filters and sorting"
+                          >
+                            Filters & Sort
+                          </button>
+                        </div>
+
+                        {/* Filter and Sort Controls */}
+                        {showFilters && (
+                          <div className="rankings-filters">
+                            {/* Tag Filters */}
+                            {availableTags.length > 0 && (
+                              <div className="filter-section">
+                                <label className="filter-label">Filter by Tags</label>
+                                <div className="tag-filter-buttons">
+                                  {availableTags.map(tag => (
+                                    <button
+                                      key={tag}
+                                      type="button"
+                                      className={`tag-filter-btn${selectedTags.includes(tag) ? ' active' : ''}`}
+                                      onClick={() => {
+                                        if (selectedTags.includes(tag)) {
+                                          setSelectedTags(selectedTags.filter(t => t !== tag))
+                                        } else {
+                                          setSelectedTags([...selectedTags, tag])
+                                        }
+                                      }}
+                                    >
+                                      {tag}
+                                    </button>
+                                  ))}
+                                </div>
+                                {selectedTags.length > 0 && (
+                                  <button
+                                    type="button"
+                                    className="clear-filters-btn"
+                                    onClick={() => setSelectedTags([])}
+                                  >
+                                    Clear Tag Filters
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Sort Controls */}
+                            <div className="filter-section">
+                              <label className="filter-label">Sort Teams By</label>
+                              <div className="sort-controls">
+                                <select
+                                  value={sortMethod}
+                                  onChange={(e) => setSortMethod(e.target.value)}
+                                  className="sort-select"
+                                >
+                                  <option value="avgRank">Average Rank</option>
+                                  <option value="observations">Number of Observations</option>
+                                  <option value="teamNumber">Team Number</option>
+                                  <option value="teamName">Team Name</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  className="sort-direction-btn"
+                                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                                  title={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}
+                                >
+                                  {sortDirection === 'asc' ? '↑' : '↓'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Active Filters Summary */}
+                            {selectedTags.length > 0 && (
+                              <div className="active-filters">
+                                <span className="active-filters-label">Active Filters:</span>
+                                <div className="active-filter-tags">
+                                  {selectedTags.map(tag => (
+                                    <span key={tag} className="active-filter-tag">
+                                      {tag}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
+                                        className="remove-filter-btn"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="rankings-list">
                         {teamRankings.map((team, index) => (
@@ -638,6 +795,19 @@ export default function AnalysisDashboard() {
                                 <span className="analysis-team-count">
                                   {team.rankCount} obs
                                 </span>
+                                {/* Show top 2 most frequent tags */}
+                                {Object.keys(team.tagCounts || {}).length > 0 && (
+                                  <div className="analysis-team-tags">
+                                    {Object.entries(team.tagCounts)
+                                      .sort(([, a], [, b]) => b - a)
+                                      .slice(0, 2)
+                                      .map(([tag, count]) => (
+                                        <span key={tag} className="analysis-tag" title={`${tag} (${count}x)`}>
+                                          {tag} ({count})
+                                        </span>
+                                      ))}
+                                  </div>
+                                )}
                               </div>
                               <span className="expand-icon">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -680,6 +850,15 @@ export default function AnalysisDashboard() {
                                           <div className="note-card-text">{r.notes}</div>
                                         ) : (
                                           <div className="note-card-text empty">No notes provided</div>
+                                        )}
+                                        {r.tags && r.tags.length > 0 && (
+                                          <div className="note-card-tags">
+                                            {r.tags.map(tag => (
+                                              <span key={tag} className="note-tag">
+                                                {tag}
+                                              </span>
+                                            ))}
+                                          </div>
                                         )}
                                         <div className="note-card-footer">
                                           {r.scouter}
