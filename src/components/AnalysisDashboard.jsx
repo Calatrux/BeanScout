@@ -6,6 +6,7 @@ import { getEventTeams, getEventInfo } from '@/lib/tba'
 import { getCachedEventData, cacheEventData, getCachedTeams } from '@/lib/tba-cache'
 import { savePicklist, deletePicklist, markPicklistSynced } from '@/lib/indexeddb'
 import { useAuth } from '@/lib/auth-context'
+import AutonsTab from '@/components/AutonsTab'
 
 export default function AnalysisDashboard() {
   const { profile } = useAuth()
@@ -222,12 +223,12 @@ export default function AnalysisDashboard() {
     // Process qual scouting entries
     qualData.forEach(entry => {
       const teams = [
-        { number: entry.team1_number, notes: entry.team1_notes, rank: 1, noShow: entry.team1_no_show, incap: entry.team1_incap, tags: entry.team1_tags },
-        { number: entry.team2_number, notes: entry.team2_notes, rank: 2, noShow: entry.team2_no_show, incap: entry.team2_incap, tags: entry.team2_tags },
-        { number: entry.team3_number, notes: entry.team3_notes, rank: 3, noShow: entry.team3_no_show, incap: entry.team3_incap, tags: entry.team3_tags },
+        { number: entry.team1_number, notes: entry.team1_notes, rank: 1, noShow: entry.team1_no_show, incap: entry.team1_incap, tags: entry.team1_tags, path: entry.team1_path || [], crossesMidline: entry.team1_crosses_midline || false },
+        { number: entry.team2_number, notes: entry.team2_notes, rank: 2, noShow: entry.team2_no_show, incap: entry.team2_incap, tags: entry.team2_tags, path: entry.team2_path || [], crossesMidline: entry.team2_crosses_midline || false },
+        { number: entry.team3_number, notes: entry.team3_notes, rank: 3, noShow: entry.team3_no_show, incap: entry.team3_incap, tags: entry.team3_tags, path: entry.team3_path || [], crossesMidline: entry.team3_crosses_midline || false },
       ]
 
-      teams.forEach(({ number, notes, rank, noShow, incap, tags }) => {
+      teams.forEach(({ number, notes, rank, noShow, incap, tags, path, crossesMidline }) => {
         if (teamStats[number]) {
           teamStats[number].rankSum += rank
           teamStats[number].rankCount += 1
@@ -241,6 +242,8 @@ export default function AnalysisDashboard() {
             noShow: noShow || false,
             incap: incap || false,
             tags: tags || [],
+            path: path || [],
+            crossesMidline: crossesMidline || false,
           })
 
           // Count tags for aggregation
@@ -654,6 +657,13 @@ export default function AnalysisDashboard() {
             >
               Picklists
             </button>
+            <button
+              type="button"
+              className={`analysis-tab${activeTab === 'autons' ? ' active' : ''}`}
+              onClick={() => setActiveTab('autons')}
+            >
+              Autons
+            </button>
           </div>
 
           {loadingData ? (
@@ -863,6 +873,9 @@ export default function AnalysisDashboard() {
                                         <div className="note-card-footer">
                                           {r.scouter}
                                         </div>
+                                        {r.crossesMidline && (
+                                          <span className="midline-badge">Crosses Midline</span>
+                                        )}
                                       </div>
                                     ))
                                   )}
@@ -1185,6 +1198,11 @@ export default function AnalysisDashboard() {
 
                   {status && <div className={`status ${status.type}`}>{status.message}</div>}
                 </div>
+              )}
+
+              {/* Autons Tab */}
+              {activeTab === 'autons' && (
+                <AutonsTab qualData={qualData} onRefresh={() => loadAnalysisData(eventKey)} />
               )}
             </>
           )}

@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { saveQualEntry, markQualEntrySynced } from '@/lib/indexeddb'
+import { saveQualEntry, markQualEntrySynced, getQualEntriesByEvent } from '@/lib/indexeddb'
 import { getEventMatches, getEventInfo, getEventTeams } from '@/lib/tba'
 import { getCachedEventData, cacheEventData } from '@/lib/tba-cache'
 import { useAuth } from '@/lib/auth-context'
+import FieldMap, { FEATURE_ZONES } from '@/components/FieldMap'
 
 // Characterization tags organized by category
 const CHARACTERIZATION_TAGS = {
@@ -35,8 +36,36 @@ const CHARACTERIZATION_TAGS = {
   ]
 }
 
+// Returns { position: 1–5, label: string } for which zone a point falls in,
+// or { position: null, label: null } if it doesn't match any zone.
+function detectZone(point, alliance) {
+  if (!point) return { position: null, label: null }
+  const { x, y } = point
+  const isBlue = alliance === 'blue'
+  for (let i = 0; i < FEATURE_ZONES.length; i++) {
+    const z = FEATURE_ZONES[i]
+    const xMin = isBlue ? z.xMin : 1 - z.xMax
+    const xMax = isBlue ? z.xMax : 1 - z.xMin
+    if (x >= xMin && x <= xMax && y >= z.yMin && y <= z.yMax) {
+      return { position: i + 1, label: z.label }
+    }
+  }
+  return { position: null, label: null }
+}
+
 function makeTeams(numbers) {
-  return numbers.map((num) => ({ number: num, notes: '', noShow: false, incap: false, tags: [] }))
+  return numbers.map((num) => ({
+    number: num,
+    notes: '',
+    noShow: false,
+    incap: false,
+    tags: [],
+    path: [],
+    crossesMidline: false,
+    startingPosition: null,
+    endLocation: null,
+    sameAsPrevious: false,
+  }))
 }
 
 export default function QualScoutForm() {
@@ -55,6 +84,9 @@ export default function QualScoutForm() {
   const [teams, setTeams] = useState([])
   const [status, setStatus] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Previous auton paths keyed by team number
+  const [prevPaths, setPrevPaths] = useState({})
 
   // Drag state
   const [draggedIndex, setDraggedIndex] = useState(null)
@@ -169,6 +201,36 @@ export default function QualScoutForm() {
     localStorage.setItem('bs_alliance', alliance)
   }, [alliance])
 
+  // Load the most-recent previous auton path for each team when teams change
+  const teamNumbersKey = teams.map(t => t.number).join(',')
+  useEffect(() => {
+    if (!eventKey || !teamNumbersKey) { setPrevPaths({}); return }
+    let cancelled = false
+    async function load() {
+      try {
+        const entries = await getQualEntriesByEvent(eventKey)
+        const newPrev = {}
+        teamNumbersKey.split(',').map(Number).forEach(num => {
+          const relevant = entries
+            .filter(e => e.alliance === alliance && [e.team1_number, e.team2_number, e.team3_number].includes(num))
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          if (!relevant.length) return
+          const e = relevant[0]
+          const path =
+            e.team1_number === num ? (e.team1_path || []) :
+            e.team2_number === num ? (e.team2_path || []) :
+                                     (e.team3_path || [])
+          if (path.length > 0) newPrev[num] = path
+        })
+        if (!cancelled) setPrevPaths(newPrev)
+      } catch (err) {
+        console.error('[QualScout] Failed to load prev paths:', err)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [teamNumbersKey, eventKey, alliance])
+
   const moveTeam = (index, dir) => {
     const target = index + dir
     if (target < 0 || target >= teams.length) return
@@ -197,6 +259,38 @@ export default function QualScoutForm() {
         : [...currentTags, tag]
       return { ...team, tags: newTags }
     }))
+  }
+
+  const updatePath = (index, newPath) => {
+    const start = detectZone(newPath[0] ?? null, alliance)
+    const end = detectZone(newPath[newPath.length - 1] ?? null, alliance)
+    setTeams((prev) => prev.map((t, i) =>
+      i === index
+        ? { ...t, path: newPath, startingPosition: start.position, endLocation: end.label }
+        : t
+    ))
+  }
+
+  const updateCrossesMidline = (index, value) => {
+    setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, crossesMidline: value } : t)))
+  }
+
+  const toggleSameAsPrevious = (index, checked) => {
+    const team = teams[index]
+    const prev = prevPaths[team.number] || []
+    if (checked) {
+      const start = detectZone(prev[0] ?? null, alliance)
+      const end = detectZone(prev[prev.length - 1] ?? null, alliance)
+      setTeams(ts => ts.map((t, i) => i === index
+        ? { ...t, sameAsPrevious: true, path: prev, startingPosition: start.position, endLocation: end.label }
+        : t
+      ))
+    } else {
+      setTeams(ts => ts.map((t, i) => i === index
+        ? { ...t, sameAsPrevious: false, path: [], startingPosition: null, endLocation: null }
+        : t
+      ))
+    }
   }
 
   const toggleTagCategory = (category) => {
@@ -307,16 +401,28 @@ export default function QualScoutForm() {
         team1_no_show: teams[0].noShow,
         team1_incap: teams[0].incap,
         team1_tags: teams[0].tags || [],
+        team1_path: teams[0].path || [],
+        team1_crosses_midline: teams[0].crossesMidline || false,
+        team1_starting_position: teams[0].startingPosition ?? null,
+        team1_end_location: teams[0].endLocation ?? null,
         team2_number: teams[1].number,
         team2_notes: teams[1].notes,
         team2_no_show: teams[1].noShow,
         team2_incap: teams[1].incap,
         team2_tags: teams[1].tags || [],
+        team2_path: teams[1].path || [],
+        team2_crosses_midline: teams[1].crossesMidline || false,
+        team2_starting_position: teams[1].startingPosition ?? null,
+        team2_end_location: teams[1].endLocation ?? null,
         team3_number: teams[2].number,
         team3_notes: teams[2].notes,
         team3_no_show: teams[2].noShow,
         team3_incap: teams[2].incap,
         team3_tags: teams[2].tags || [],
+        team3_path: teams[2].path || [],
+        team3_crosses_midline: teams[2].crossesMidline || false,
+        team3_starting_position: teams[2].startingPosition ?? null,
+        team3_end_location: teams[2].endLocation ?? null,
         scouter_name: scouterName,
         created_at: new Date().toISOString(),
         synced: false,
@@ -543,6 +649,38 @@ export default function QualScoutForm() {
                 placeholder={`Why rank #${index + 1}? What did team ${team.number} do?`}
                 rows={3}
               />
+
+              {/* Field Path Map */}
+              <div className="team-field-map-section">
+                <div className="field-map-section-header">
+                  <label className="tags-label">Auton Path</label>
+                  {prevPaths[team.number] && (
+                    <label className="same-as-prev-label">
+                      <input
+                        type="checkbox"
+                        checked={team.sameAsPrevious || false}
+                        onChange={(e) => toggleSameAsPrevious(index, e.target.checked)}
+                      />
+                      Same as previous
+                    </label>
+                  )}
+                </div>
+                <FieldMap
+                  points={team.path || []}
+                  onChange={(newPath) => updatePath(index, newPath)}
+                  color={alliance === 'red' ? '#ef4444' : '#3b82f6'}
+                  alliance={alliance}
+                  ghostPoints={!team.sameAsPrevious ? (prevPaths[team.number] || []) : []}
+                />
+                <label className="midline-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={team.crossesMidline || false}
+                    onChange={(e) => updateCrossesMidline(index, e.target.checked)}
+                  />
+                  Crossed midline (auton)
+                </label>
+              </div>
 
               {/* Characterization Tags */}
               <div className="team-tags-section">

@@ -213,6 +213,11 @@ export async function markPicklistSynced(id) {
   if (picklist) await withTimeout(db.put('picklists', { ...picklist, synced: true }), OPERATION_TIMEOUT, 'mark picklist synced')
 }
 
+export async function getQualEntriesByEvent(eventKey) {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for qual entries by event')
+  return withTimeout(db.getAllFromIndex('qual_scouting', 'by_event', eventKey), OPERATION_TIMEOUT, 'get qual entries by event')
+}
+
 export async function getAllPicklists() {
   const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for get all picklists')
   return withTimeout(db.getAll('picklists'), OPERATION_TIMEOUT, 'get all picklists')
