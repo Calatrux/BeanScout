@@ -66,6 +66,22 @@ export default function SyncBanner() {
     }
   }, [refreshCount])
 
+  const ensureAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) return true
+    console.log('[SyncBanner] No session, attempting auto-login for sync...')
+    const { error } = await supabase.auth.signInWithPassword({
+      email: 'Braftedr@gmail.com',
+      password: 'Hello123',
+    })
+    if (error) {
+      console.error('[SyncBanner] Auto-login failed:', error.message)
+      return false
+    }
+    console.log('[SyncBanner] Auto-login succeeded')
+    return true
+  }
+
   const handleSync = async () => {
     setSyncing(true)
     setSyncError(null)
@@ -73,6 +89,11 @@ export default function SyncBanner() {
     let failCount = 0
 
     try {
+      if (!await ensureAuth()) {
+        setSyncError('Login failed')
+        setSyncing(false)
+        return
+      }
       console.log('[SyncBanner] Starting sync...')
       const [qualEntries, teamNotes, picklists] = await Promise.all([
         getUnsyncedQualEntries(),
