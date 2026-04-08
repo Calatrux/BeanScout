@@ -249,6 +249,7 @@ export default function QualScoutForm() {
     setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)))
   }
 
+  
   const toggleTag = (teamIndex, tag) => {
     setTeams((prev) => prev.map((team, i) => {
       if (i !== teamIndex) return team
