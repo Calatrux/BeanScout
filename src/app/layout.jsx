@@ -2,12 +2,20 @@ import './globals.css'
 import Nav from '@/components/Nav'
 import { AuthProvider } from '@/lib/auth-context'
 import { debugLog } from '@/lib/debug'
+import PWAProvider from '@/components/PWAProvider'
 
 export const metadata = {
   title: 'BEAN Scout',
   description: 'Qualitative FRC scouting tool',
+  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'BEAN Scout',
   },
 }
 
@@ -28,10 +36,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <Nav />
-          <main>{children}</main>
-        </AuthProvider>
+        <PWAProvider>
+          <AuthProvider>
+            <Nav />
+            <main>{children}</main>
+          </AuthProvider>
+        </PWAProvider>
       </body>
     </html>
   )

@@ -9,6 +9,7 @@ export default function SyncBanner() {
   const [syncing, setSyncing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [syncError, setSyncError] = useState(null)
+  const [isOffline, setIsOffline] = useState(false)
 
   const refreshCount = useCallback(async () => {
     try {
@@ -28,10 +29,41 @@ export default function SyncBanner() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    setIsOffline(!navigator.onLine)
     refreshCount()
 
     window.addEventListener('beanscout:saved', refreshCount)
-    return () => window.removeEventListener('beanscout:saved', refreshCount)
+
+    const handleOnline = () => {
+      setIsOffline(false)
+      // Auto-sync when connectivity returns
+      refreshCount().then(() => {
+        // handleSync is called via a small delay to let network stabilize
+        setTimeout(() => {
+          if (navigator.onLine) handleSync()
+        }, 1000)
+      })
+    }
+
+    const handleOffline = () => setIsOffline(true)
+
+    // Auto-sync when iOS PWA resumes from background
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        refreshCount()
+      }
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      window.removeEventListener('beanscout:saved', refreshCount)
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [refreshCount])
 
   const handleSync = async () => {
@@ -125,17 +157,22 @@ export default function SyncBanner() {
     }
   }
 
-  if (loading || count === 0) return null
+  if (loading || (count === 0 && !isOffline)) return null
 
   return (
     <div className="sync-banner">
-      <span>
-        {count} pending
-        {syncError && <span className="sync-error"> ({syncError})</span>}
-      </span>
-      <button className="sync-btn" onClick={handleSync} disabled={syncing}>
-        {syncing ? 'Syncing...' : 'Sync'}
-      </button>
+      {isOffline && <span className="offline-badge">Offline</span>}
+      {count > 0 && (
+        <>
+          <span>
+            {count} pending
+            {syncError && <span className="sync-error"> ({syncError})</span>}
+          </span>
+          <button className="sync-btn" onClick={handleSync} disabled={syncing || isOffline}>
+            {syncing ? 'Syncing...' : 'Sync'}
+          </button>
+        </>
+      )}
     </div>
   )
 }
