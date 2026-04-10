@@ -322,36 +322,22 @@ export default function AnalysisDashboard() {
   const saveCurrentPicklist = useCallback(async (newTeams, newNotes) => {
     if (!activePicklist || !isAdmin) return
 
-    try {
-      const updatedPicklist = {
-        ...activePicklist,
-        teams: newTeams,
-        notes: newNotes,
-        updated_at: new Date().toISOString(),
-        synced: false,
-      }
+    const updatedPicklist = {
+      ...activePicklist,
+      teams: newTeams,
+      notes: newNotes,
+      updated_at: new Date().toISOString(),
+      synced: false,
+    }
 
-      await savePicklist(updatedPicklist)
-      setTeamPicklists(prev => prev.map(p => p.id === updatedPicklist.id ? updatedPicklist : p))
+    await savePicklist(updatedPicklist)
+    setTeamPicklists(prev => prev.map(p => p.id === updatedPicklist.id ? updatedPicklist : p))
 
-      // Try to sync to Supabase silently with timeout
-      const { synced: _s, ...supabaseRecord } = updatedPicklist
-      try {
-        const syncPromise = supabase.from('picklists').upsert(supabaseRecord)
-        const { error } = await Promise.race([
-          syncPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 5000))
-        ])
-        if (!error) {
-          await markPicklistSynced(updatedPicklist.id)
-          setTeamPicklists(prev => prev.map(p => p.id === updatedPicklist.id ? { ...p, synced: true } : p))
-        }
-      } catch {
-        // Silent fail for sync
-      }
-    } catch (err) {
-      console.error('[Admin] Save failed:', err)
-      setStatus({ type: 'error', message: 'Failed to save team picklist.' })
+    const { synced: _s, ...supabaseRecord } = updatedPicklist
+    const { error } = await supabase.from('picklists').upsert(supabaseRecord)
+    if (!error) {
+      await markPicklistSynced(updatedPicklist.id)
+      setTeamPicklists(prev => prev.map(p => p.id === updatedPicklist.id ? { ...p, synced: true } : p))
     }
   }, [activePicklist, isAdmin])
 
@@ -362,9 +348,8 @@ export default function AnalysisDashboard() {
       return
     }
 
-    const id = crypto.randomUUID()
     const newPicklist = {
-      id,
+      id: crypto.randomUUID(),
       name: newPicklistName.trim(),
       event_key: eventKey.trim(),
       scouter_name: 'TEAM_WIDE',
@@ -382,22 +367,13 @@ export default function AnalysisDashboard() {
       setNewPicklistName('')
       setShowCreateModal(false)
 
-      // Try to sync with timeout
       const { synced: _s, ...supabaseRecord } = newPicklist
-      try {
-        const syncPromise = supabase.from('picklists').upsert(supabaseRecord)
-        const { error } = await Promise.race([
-          syncPromise,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 5000))
-        ])
-        if (!error) {
-          await markPicklistSynced(id)
-          setTeamPicklists(prev => prev.map(p => p.id === id ? { ...p, synced: true } : p))
-          setStatus({ type: 'success', message: `Team picklist "${newPicklist.name}" created and synced!` })
-        } else {
-          setStatus({ type: 'success', message: `Team picklist "${newPicklist.name}" created! Will sync later.` })
-        }
-      } catch {
+      const { error } = await supabase.from('picklists').insert(supabaseRecord)
+      if (!error) {
+        await markPicklistSynced(newPicklist.id)
+        setTeamPicklists(prev => prev.map(p => p.id === newPicklist.id ? { ...p, synced: true } : p))
+        setStatus({ type: 'success', message: `Team picklist "${newPicklist.name}" created!` })
+      } else {
         setStatus({ type: 'success', message: `Team picklist "${newPicklist.name}" created! Will sync later.` })
       }
     } catch (err) {
@@ -420,7 +396,6 @@ export default function AnalysisDashboard() {
       }
       setStatus({ type: 'success', message: 'Team picklist deleted.' })
 
-      // Try to delete from Supabase
       await supabase.from('picklists').delete().eq('id', picklistId)
     } catch (err) {
       console.error('[Admin] Delete failed:', err)
@@ -445,6 +420,13 @@ export default function AnalysisDashboard() {
       await savePicklist(updatedPicklist)
       setTeamPicklists(prev => prev.map(p => p.id === updatedPicklist.id ? updatedPicklist : p))
       setEditingName(false)
+
+      const { synced: _s, ...supabaseRecord } = updatedPicklist
+      const { error } = await supabase.from('picklists').upsert(supabaseRecord)
+      if (!error) {
+        await markPicklistSynced(updatedPicklist.id)
+        setTeamPicklists(prev => prev.map(p => p.id === updatedPicklist.id ? { ...p, synced: true } : p))
+      }
     } catch (err) {
       console.error('[Admin] Rename failed:', err)
     }
