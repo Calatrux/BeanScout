@@ -12,7 +12,7 @@ const AuthContext = createContext({
 })
 
 // If loading takes longer than this, assume the session is stuck and clear it
-const AUTH_TIMEOUT_MS = 8000
+const AUTH_TIMEOUT_MS = 4000
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
