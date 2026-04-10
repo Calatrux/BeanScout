@@ -131,6 +131,8 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('[Auth] Sign out error (non-fatal):', err)
     }
+    // Clear everything — Supabase session tokens, bs_* keys, any stuck auth locks
+    localStorage.clear()
   }
 
   return (

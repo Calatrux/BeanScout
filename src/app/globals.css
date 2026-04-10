@@ -3397,6 +3397,11 @@ button { cursor: pointer; font-family: inherit; }
   pointer-events: none;
 }
 
+.auton-map-container.auton-map-clickable {
+  pointer-events: auto;
+  cursor: zoom-in;
+}
+
 .auton-map-container .field-map-wrapper {
   height: 100%;
 }
@@ -3404,6 +3409,116 @@ button { cursor: pointer; font-family: inherit; }
 .auton-map-container .field-map-controls,
 .auton-map-container .field-map-footer {
   display: none;
+}
+
+/* ── Auton expanded modal ─────────────────────────────────────────────────── */
+.auton-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.auton-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.auton-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+
+.auton-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.auton-modal-sep {
+  color: var(--text-muted);
+}
+
+.auton-modal-close {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.auton-modal-close:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.auton-modal-field {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+}
+
+.auton-modal-field .field-map-wrapper {
+  height: 100%;
+}
+
+.auton-modal-field .field-map-controls {
+  display: none;
+}
+
+.auton-modal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.auton-modal-counter {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 60px;
+  text-align: right;
+}
+
+.auton-play-btn {
+  background: var(--bean-teal);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.auton-play-btn:hover {
+  opacity: 0.85;
 }
 
 /* ── Qual scout same-as-previous ─────────────────────────────────────────── */
