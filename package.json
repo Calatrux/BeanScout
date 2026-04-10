@@ -9,11 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
+    "geist": "^1.7.0",
+    "idb": "^8.0.2",
     "next": "^15.3.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@supabase/supabase-js": "^2.49.4",
-    "idb": "^8.0.2"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "eslint": "^9.0.0",
