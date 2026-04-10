@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { debugLog } from '@/lib/debug'
 
@@ -11,119 +11,126 @@ const AuthContext = createContext({
   signOut: async () => {},
 })
 
+// If loading takes longer than this, assume the session is stuck and clear it
+const AUTH_TIMEOUT_MS = 8000
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const timeoutRef = useRef(null)
+
+  const finishLoading = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    setLoading(false)
+  }
 
   useEffect(() => {
-    // Skip auth initialization during build time
     if (typeof window === 'undefined') return
 
     debugLog('AuthProvider', 'Starting auth initialization')
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      debugLog('AuthProvider', 'Initial session retrieved', { hasSession: !!session })
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
-        setLoading(false)
-        debugLog('AuthProvider', 'Auth load complete (no user)')
-        window.beanscoutDebug?.markLoaded('AuthProvider')
-      }
-    }).catch(err => {
-      debugLog('AuthProvider', 'Failed to get initial session', err)
+    // Escape hatch: if we're still loading after AUTH_TIMEOUT_MS, the session
+    // is likely stuck (e.g. a stale Supabase auth lock in localStorage).
+    // Force-clear it so the user can sign in again without manually clearing storage.
+    timeoutRef.current = setTimeout(() => {
+      console.warn('[Auth] Session stuck — force-clearing auth state')
+      supabase.auth.signOut().catch(() => {})
+      setUser(null)
+      setProfile(null)
       setLoading(false)
-    })
+    }, AUTH_TIMEOUT_MS)
 
-    // Listen for auth changes
+    // onAuthStateChange fires INITIAL_SESSION on startup, so we don't need a
+    // separate getSession() call. Using both causes fetchProfile() to run twice
+    // simultaneously, which is a race condition that leaves loading=true.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         debugLog('AuthProvider', 'Auth state changed', { event })
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-        } else {
+
+        if (!session?.user) {
+          setUser(null)
           setProfile(null)
-          setLoading(false)
+          finishLoading()
+          return
         }
+
+        // Token refresh just rotates the JWT — user and profile haven't changed,
+        // so skip the unnecessary DB round-trip.
+        if (event === 'TOKEN_REFRESHED') {
+          setUser(session.user)
+          finishLoading()
+          return
+        }
+
+        setUser(session.user)
+        await fetchProfile(session.user.id)
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const fetchProfile = async (userId) => {
     debugLog('AuthProvider', 'Fetching profile for userId:', userId)
-    console.log('[Auth] Fetching profile for userId:', userId)
 
-    const { data, error, status } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-    debugLog('AuthProvider', 'Profile fetch result:', { hasData: !!data, hasError: !!error })
-    console.log('[Auth] Profile fetch result:', { data, error, status })
+      if (error) {
+        // RLS recursion — retrying won't help
+        if (error.code === '42P17') {
+          console.error('[Auth] RLS policy recursion detected. Check Supabase policies.')
+          finishLoading()
+          return
+        }
 
-    if (error) {
-      console.error('[Auth] Error fetching profile:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      })
+        // Profile might not exist yet (trigger delay) — retry once after 1s
+        console.log('[Auth] Profile not found, retrying in 1s...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
 
-      // If it's a recursion error, don't retry - it's a policy issue
-      if (error.code === '42P17') {
-        console.error('[Auth] RLS policy recursion detected. Check Supabase policies.')
-        setLoading(false)
-        debugLog('AuthProvider', 'Auth load complete (policy error)')
-        window.beanscoutDebug?.markLoaded('AuthProvider')
-        return
-      }
-
-      // Profile might not exist yet (trigger delay), retry once
-      debugLog('AuthProvider', 'Retrying profile fetch in 1 second...')
-      console.log('[Auth] Retrying profile fetch in 1 second...')
-      setTimeout(async () => {
         const { data: retryData, error: retryError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single()
 
-        debugLog('AuthProvider', 'Retry result:', { hasRetryData: !!retryData, hasRetryError: !!retryError })
-        console.log('[Auth] Retry result:', { retryData, retryError })
-
         if (!retryError && retryData) {
           setProfile(retryData)
         } else {
-          console.error('[Auth] Retry failed:', retryError)
+          console.error('[Auth] Profile retry failed:', retryError)
         }
-        setLoading(false)
-        debugLog('AuthProvider', 'Auth load complete (after retry)')
-        window.beanscoutDebug?.markLoaded('AuthProvider')
-      }, 1000)
-      return
-    }
+        finishLoading()
+        return
+      }
 
-    if (data) {
-      debugLog('AuthProvider', 'Profile loaded successfully')
-      console.log('[Auth] Profile loaded:', data)
       setProfile(data)
+      finishLoading()
+    } catch (err) {
+      console.error('[Auth] Unexpected error fetching profile:', err)
+      finishLoading()
     }
-    setLoading(false)
-    debugLog('AuthProvider', 'Auth load complete (success)')
-    window.beanscoutDebug?.markLoaded('AuthProvider')
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    // Reset state immediately so the UI is responsive even if the network call hangs
     setUser(null)
     setProfile(null)
+    try {
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('[Auth] Sign out error (non-fatal):', err)
+    }
   }
 
   return (

@@ -99,7 +99,7 @@ export default function AnalysisDashboard() {
 
   // Restore persisted event key
   useEffect(() => {
-    const event = localStorage.getItem('bs_event_key')
+    const event = localStorage.getItem('bs_event_key') || process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || ''
     if (event) setEventKey(event)
   }, [])
 

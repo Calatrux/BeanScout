@@ -103,7 +103,7 @@ export default function QualScoutForm() {
 
   // Restore persisted event key and alliance
   useEffect(() => {
-    const event = localStorage.getItem('bs_event_key')
+    const event = localStorage.getItem('bs_event_key') || process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || ''
     const savedAlliance = localStorage.getItem('bs_alliance')
     if (event) setEventKey(event)
     if (savedAlliance) setAlliance(savedAlliance)
