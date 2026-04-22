@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { saveTeamNote, markTeamNoteSynced } from '@/lib/indexeddb'
-import { getEventTeams, getEventInfo } from '@/lib/tba'
-import { getCachedEventData, cacheEventData, getCachedTeams } from '@/lib/tba-cache'
+import { getEventMatches, getEventInfo, getEventTeams } from '@/lib/tba'
+import { getCachedEventData, cacheEventData } from '@/lib/tba-cache'
 import { useAuth } from '@/lib/auth-context'
+
+function makeTeams(numbers) {
+  return numbers.map((num) => ({ number: num, notes: '', isUpdate: false, noChange: false }))
+}
 
 export default function TeamNotesForm() {
   const { profile } = useAuth()
@@ -13,103 +17,69 @@ export default function TeamNotesForm() {
   // Event state
   const [eventKey, setEventKey] = useState('')
   const [eventInfo, setEventInfo] = useState(null)
-  const [teams, setTeams] = useState([])
+  const [matches, setMatches] = useState([])
   const [loadingEvent, setLoadingEvent] = useState(false)
   const [eventError, setEventError] = useState(null)
 
   // Form state
-  const [selectedTeam, setSelectedTeam] = useState(null)
-  const [teamSearch, setTeamSearch] = useState('')
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [matchNumber, setMatchNumber] = useState('')
-  const [note, setNote] = useState('')
-  const [isUpdate, setIsUpdate] = useState(false)
+  const [selectedMatch, setSelectedMatch] = useState('')
+  const [alliance, setAlliance] = useState('red')
+  const [teams, setTeams] = useState([])
   const [status, setStatus] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const dropdownRef = useRef(null)
-
-  // Get scouter name from profile
   const scouterName = profile
     ? `${profile.first_name} ${profile.last_name}`.trim() || profile.username
     : ''
 
-  // Restore persisted event key
+  // Restore persisted event key and alliance
   useEffect(() => {
     const event = localStorage.getItem('bs_event_key') || process.env.NEXT_PUBLIC_DEFAULT_EVENT_KEY || ''
+    const savedAlliance = localStorage.getItem('bs_alliance')
     if (event) setEventKey(event)
+    if (savedAlliance) setAlliance(savedAlliance)
   }, [])
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  // Load event data
   const loadEventData = useCallback(async (key) => {
     if (!key || key.length < 4) {
       setEventInfo(null)
-      setTeams([])
+      setMatches([])
       setEventError(null)
       return
     }
 
-    console.log('[TeamNotes] Loading event:', key)
     setLoadingEvent(true)
     setEventError(null)
 
     try {
-      // Try cache first
-      console.log('[TeamNotes] Checking cache...')
       const cached = await getCachedEventData(key)
-      if (cached && cached.teams && cached.teams.length > 0) {
-        console.log('[TeamNotes] Using cached data')
+      if (cached && cached.matches && cached.matches.length > 0) {
         setEventInfo(cached.info)
-        setTeams(cached.teams || [])
+        setMatches(cached.matches)
         localStorage.setItem('bs_event_key', key)
         setLoadingEvent(false)
         return
       }
-      console.log('[TeamNotes] Cache miss or incomplete, fetching fresh data')
 
-      // Fetch from TBA
-      console.log('[TeamNotes] Fetching from TBA...')
-      const [info, teamsData] = await Promise.all([
+      const [info, matchData, teamsData] = await Promise.all([
         getEventInfo(key),
+        getEventMatches(key, true),
         getEventTeams(key),
       ])
 
-      console.log('[TeamNotes] TBA data received:', { info, teamCount: teamsData.length })
       setEventInfo(info)
-      setTeams(teamsData)
+      setMatches(matchData)
       localStorage.setItem('bs_event_key', key)
 
-      // Cache for offline use (don't wait for it, merge with existing cache)
-      const existingCache = await getCachedEventData(key)
-      cacheEventData(key, info, existingCache?.matches || [], teamsData).catch(err => {
+      cacheEventData(key, info, matchData, teamsData).catch(err => {
         console.error('[TeamNotes] Cache write failed (non-fatal):', err)
       })
     } catch (err) {
       console.error('[TeamNotes] Event load error:', err)
-      // Try to get teams from cache even if refresh failed
-      const cachedTeams = await getCachedTeams(key)
-      if (cachedTeams) {
-        console.log('[TeamNotes] Using stale cached teams')
-        setTeams(cachedTeams)
-        setEventError('Using cached team list. Could not refresh from TBA.')
-      } else {
-        setEventError(`Could not load event: ${err.message || 'Unknown error'}`)
-        setTeams([])
-      }
+      setEventError(`Could not load event: ${err.message || 'Unknown error'}`)
       setEventInfo(null)
+      setMatches([])
     } finally {
-      console.log('[TeamNotes] Load complete, setting loading to false')
       setLoadingEvent(false)
     }
   }, [])
@@ -117,115 +87,108 @@ export default function TeamNotesForm() {
   // Debounced event loading
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (eventKey) {
-        loadEventData(eventKey)
-      }
+      if (eventKey) loadEventData(eventKey)
     }, 500)
     return () => clearTimeout(timer)
   }, [eventKey, loadEventData])
 
-  // Filter teams based on search
-  const filteredTeams = teams.filter((team) => {
-    const search = teamSearch.toLowerCase()
-    return (
-      String(team.number).includes(search) ||
-      team.name?.toLowerCase().includes(search)
-    )
-  })
+  // Auto-select first match when matches load
+  useEffect(() => {
+    if (matches.length > 0 && !selectedMatch) {
+      setSelectedMatch(String(matches[0].matchNumber))
+    }
+  }, [matches, selectedMatch])
 
-  const handleTeamSelect = (team) => {
-    setSelectedTeam(team)
-    setTeamSearch(String(team.number))
-    setDropdownOpen(false)
+  // Update teams when match or alliance changes
+  useEffect(() => {
+    if (!selectedMatch || matches.length === 0) { setTeams([]); return }
+    const match = matches.find(m => String(m.matchNumber) === selectedMatch)
+    if (match) {
+      setTeams(makeTeams(alliance === 'red' ? match.red : match.blue))
+    }
+  }, [selectedMatch, alliance, matches])
+
+  // Persist alliance choice
+  useEffect(() => {
+    localStorage.setItem('bs_alliance', alliance)
+  }, [alliance])
+
+  const updateNotes = (index, value) => {
+    setTeams(prev => prev.map((t, i) => i === index ? { ...t, notes: value } : t))
   }
 
-  const handleTeamSearchChange = (value) => {
-    setTeamSearch(value)
-    setSelectedTeam(null)
-    setDropdownOpen(true)
+  const updateFlag = (index, field, value) => {
+    setTeams(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setStatus(null)
 
-    if (!selectedTeam) {
-      setStatus({ type: 'error', message: 'Please select a team from the dropdown.' })
+    if (!eventKey.trim() || !selectedMatch || !scouterName) {
+      setStatus({ type: 'error', message: 'Event and match are required. Make sure you are signed in.' })
       return
     }
-
-    if (!note.trim() || !scouterName || !eventKey.trim()) {
-      setStatus({ type: 'error', message: 'Event key and note are required. Make sure you are signed in.' })
+    if (teams.length !== 3) {
+      setStatus({ type: 'error', message: 'Match data not loaded. Select a valid match.' })
       return
     }
 
     setSubmitting(true)
-    localStorage.setItem('bs_event_key', eventKey.trim())
 
     try {
-      const id = crypto.randomUUID()
-      const entry = {
-        id,
-        event_key: eventKey.trim(),
-        team_number: selectedTeam.number,
-        match_number: matchNumber ? parseInt(matchNumber, 10) : null,
-        note: note.trim(),
-        is_update: isUpdate,
-        scouter_name: scouterName,
-        created_at: new Date().toISOString(),
-        synced: false,
-      }
+      const matchNum = parseInt(selectedMatch, 10)
+      const entries = teams
+        .filter(team => !team.noChange)
+        .map(team => ({
+          id: crypto.randomUUID(),
+          event_key: eventKey.trim(),
+          team_number: team.number,
+          match_number: matchNum,
+          note: team.notes.trim(),
+          is_update: team.isUpdate,
+          scouter_name: scouterName,
+          created_at: new Date().toISOString(),
+          synced: false,
+        }))
 
-      console.log('[TeamNotes] Saving entry to IndexedDB...')
-      await saveTeamNote(entry)
-      console.log('[TeamNotes] Entry saved to IndexedDB successfully')
+      // Save all to IndexedDB first
+      await Promise.all(entries.map(entry => saveTeamNote(entry)))
 
-      console.log('[TeamNotes] Attempting Supabase sync...')
-      const { synced: _s, ...supabaseRecord } = entry
+      // Attempt Supabase sync with timeout
+      let syncFailed = false
+      let syncError = null
       try {
-        const syncPromise = supabase.from('team_notes').insert(supabaseRecord)
+        const supabaseRecords = entries.map(({ synced, ...rest }) => rest)
+        const syncPromise = supabase.from('team_notes').insert(supabaseRecords)
         const { error } = await Promise.race([
           syncPromise,
           new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 5000))
         ])
-
-        if (error) {
-          console.log('[TeamNotes] Supabase sync failed:', error.message)
-          window.dispatchEvent(new Event('beanscout:saved'))
-          setStatus({
-            type: 'warning',
-            message: `Saved locally. Will sync when online. (${error.message})`,
-          })
-        } else {
-          console.log('[TeamNotes] Supabase sync successful')
-          await markTeamNoteSynced(id)
-          window.dispatchEvent(new Event('beanscout:saved'))
-          setStatus({
-            type: 'success',
-            message: `Note for team ${selectedTeam.number} saved and synced.${isUpdate ? ' (Marked as update)' : ''}`,
-          })
+        if (error) { syncFailed = true; syncError = error.message }
+        else {
+          await Promise.all(entries.map(entry => markTeamNoteSynced(entry.id)))
         }
       } catch (syncErr) {
-        console.log('[TeamNotes] Supabase sync timed out or failed:', syncErr.message)
-        window.dispatchEvent(new Event('beanscout:saved'))
-        setStatus({
-          type: 'warning',
-          message: 'Saved locally. Will sync when online.',
-        })
+        syncFailed = true; syncError = syncErr.message
       }
 
-      // Reset note-specific fields, keep persistent context
-      setSelectedTeam(null)
-      setTeamSearch('')
-      setMatchNumber('')
-      setNote('')
-      setIsUpdate(false)
+      window.dispatchEvent(new Event('beanscout:saved'))
+
+      if (syncFailed) {
+        setStatus({ type: 'warning', message: `Saved locally. Will sync when online.${syncError ? ` (${syncError})` : ''}` })
+      } else {
+        setStatus({ type: 'success', message: `Match ${matchNum} (${alliance}) notes saved and synced.` })
+      }
+
+      // Advance to next match
+      const currentIndex = matches.findIndex(m => String(m.matchNumber) === selectedMatch)
+      if (currentIndex >= 0 && currentIndex < matches.length - 1) {
+        setSelectedMatch(String(matches[currentIndex + 1].matchNumber))
+      }
     } catch (err) {
       console.error('[TeamNotes] Submit error:', err)
-      setStatus({
-        type: 'error',
-        message: `Failed to save note: ${err.message}. Please try again.`
-      })
+      setStatus({ type: 'error', message: `Failed to save notes: ${err.message}. Please try again.` })
     } finally {
       setSubmitting(false)
     }
@@ -234,7 +197,7 @@ export default function TeamNotesForm() {
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>
       <div className="form-header-with-scouter">
-        <h1 className="form-title">Team Note</h1>
+        <h1 className="form-title">Team Notes</h1>
         {scouterName && (
           <div className="scouter-display">
             Scouting as <strong>{scouterName}</strong>
@@ -242,7 +205,7 @@ export default function TeamNotesForm() {
         )}
       </div>
 
-      {/* Event key */}
+      {/* Event Key */}
       <div className="field">
         <label htmlFor="tn-event">Event Key</label>
         <input
@@ -255,7 +218,6 @@ export default function TeamNotesForm() {
         />
       </div>
 
-      {/* Event info banner */}
       {loadingEvent && (
         <div className="loading-text">
           <span className="loading-spinner" />
@@ -263,114 +225,110 @@ export default function TeamNotesForm() {
         </div>
       )}
 
-      {eventError && (
-        <div className="status warning">{eventError}</div>
-      )}
+      {eventError && <div className="status error">{eventError}</div>}
 
       {eventInfo && !loadingEvent && (
         <div className="event-banner">
           <div className="event-banner-info">
             <span className="event-banner-name">{eventInfo.name}</span>
-            <span className="event-banner-key">{eventInfo.key} | {teams.length} teams</span>
+            <span className="event-banner-key">{eventInfo.key} | {matches.length} qual matches</span>
           </div>
         </div>
       )}
 
-      {/* Team selector + Match */}
-      <div className="form-row">
-        <div className="field" ref={dropdownRef}>
-          <label htmlFor="tn-team">Team</label>
-          <div className="team-search-container">
-            <input
-              id="tn-team"
-              type="text"
-              value={teamSearch}
-              onChange={(e) => handleTeamSearchChange(e.target.value)}
-              onFocus={() => teams.length > 0 && setDropdownOpen(true)}
-              placeholder={teams.length > 0 ? 'Search teams...' : 'Load event first'}
-              autoComplete="off"
-              disabled={teams.length === 0}
-            />
-            {dropdownOpen && filteredTeams.length > 0 && (
-              <div className="team-dropdown">
-                {filteredTeams.slice(0, 8).map((team) => (
-                  <button
-                    key={team.number}
-                    type="button"
-                    className={`team-dropdown-item${selectedTeam?.number === team.number ? ' selected' : ''}`}
-                    onClick={() => handleTeamSelect(team)}
-                  >
-                    <span className="team-dropdown-number">{team.number}</span>
-                    <span className="team-dropdown-name">{team.name}</span>
-                  </button>
-                ))}
-                {filteredTeams.length > 8 && (
-                  <div className="team-dropdown-hint">
-                    {filteredTeams.length - 8} more teams. Keep typing to narrow results.
-                  </div>
-                )}
-              </div>
-            )}
-            {dropdownOpen && teamSearch && filteredTeams.length === 0 && (
-              <div className="team-dropdown">
-                <div className="team-dropdown-hint">No teams found</div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Match selector */}
+      {matches.length > 0 && (
         <div className="field">
-          <label htmlFor="tn-match">
-            Match # <span style={{ color: 'var(--text-dim)', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-          </label>
-          <input
+          <label htmlFor="tn-match">Match</label>
+          <select
             id="tn-match"
-            type="number"
-            value={matchNumber}
-            onChange={(e) => setMatchNumber(e.target.value)}
-            placeholder="leave blank if general"
-            min="1"
-          />
+            value={selectedMatch}
+            onChange={(e) => setSelectedMatch(e.target.value)}
+          >
+            <option value="">Select a match...</option>
+            {matches.map((match) => (
+              <option key={match.key} value={String(match.matchNumber)}>
+                Qual {match.matchNumber}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
-
-      {/* Note */}
-      <div className="field">
-        <label htmlFor="tn-note">Note</label>
-        <textarea
-          id="tn-note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="What did you observe? Be specific: what happened, when, and why it matters."
-          rows={5}
-        />
-      </div>
-
-      {/* Is Update toggle */}
-      <div
-        role="checkbox"
-        aria-checked={isUpdate}
-        tabIndex={0}
-        className={`toggle-field${isUpdate ? ' active' : ''}`}
-        onClick={() => setIsUpdate((v) => !v)}
-        onKeyDown={(e) => e.key === ' ' || e.key === 'Enter' ? setIsUpdate((v) => !v) : null}
-      >
-        <div className="toggle-switch" />
-        <div className="toggle-label">
-          <div className="toggle-label-title">Mark as Update</div>
-          <div className="toggle-label-desc">
-            This note revises or supersedes an earlier observation. Updates are weighted
-            more heavily when analyzing a team. Use this for corrections or significant
-            new findings.
-          </div>
-        </div>
-      </div>
-
-      {status && (
-        <div className={`status ${status.type}`}>{status.message}</div>
       )}
 
-      <button type="submit" className="submit-btn" disabled={submitting}>
-        {submitting ? 'Saving...' : 'Submit Note'}
+      {/* Alliance */}
+      {selectedMatch && (
+        <div className="field">
+          <label>Alliance You&apos;re Scouting</label>
+          <div className="alliance-toggle">
+            <button
+              type="button"
+              className={`alliance-btn red${alliance === 'red' ? ' active' : ''}`}
+              onClick={() => setAlliance('red')}
+            >
+              Red
+            </button>
+            <button
+              type="button"
+              className={`alliance-btn blue${alliance === 'blue' ? ' active' : ''}`}
+              onClick={() => setAlliance('blue')}
+            >
+              Blue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Team notes cards */}
+      {teams.length === 3 && (
+        <div className="teams-section">
+          {teams.map((team, index) => (
+            <div
+              key={`${selectedMatch}-${alliance}-${team.number}`}
+              className={`team-card ${alliance}`}
+            >
+              <div className="team-header">
+                <span className="team-number">{team.number}</span>
+                <div className="team-status-buttons">
+                  <label className="status-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={team.isUpdate}
+                      onChange={(e) => updateFlag(index, 'isUpdate', e.target.checked)}
+                    />
+                    Update
+                  </label>
+                  <label className="status-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={team.noChange}
+                      onChange={(e) => updateFlag(index, 'noChange', e.target.checked)}
+                    />
+                    No significant change
+                  </label>
+                </div>
+              </div>
+              {!team.noChange && (
+                <textarea
+                  className="team-notes"
+                  value={team.notes}
+                  onChange={(e) => updateNotes(index, e.target.value)}
+                  placeholder={`Notes for team ${team.number}…`}
+                  rows={4}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {status && <div className={`status ${status.type}`}>{status.message}</div>}
+
+      <button
+        type="submit"
+        className="submit-btn"
+        disabled={submitting || teams.length !== 3}
+      >
+        {submitting ? 'Saving...' : 'Submit Notes'}
       </button>
     </form>
   )

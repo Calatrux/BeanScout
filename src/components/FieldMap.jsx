@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 
 const POINT_RADIUS = 7
 const LINE_WIDTH = 2.5
@@ -36,6 +36,34 @@ export default function FieldMap({
   const canvasRef = useRef(null)
   const imgRef = useRef(null)
   const containerRef = useRef(null)
+
+  // Undo/redo stacks — store snapshots of the points array
+  const undoStack = useRef([])
+  const redoStack = useRef([])
+  // Track last points ref so we can detect external (parent-driven) changes
+  const lastKnownPoints = useRef(points)
+  const [, forceUpdate] = useState(0)  // used to re-render when stacks change
+
+  // If the parent changes points externally (e.g. "same as previous" toggle),
+  // wipe history so undo/redo don't produce surprising results.
+  // We use a separate flag ref to distinguish internal vs external updates.
+  const internalChange = useRef(false)
+  useEffect(() => {
+    if (!internalChange.current && points !== lastKnownPoints.current) {
+      undoStack.current = []
+      redoStack.current = []
+      forceUpdate(n => n + 1)
+    }
+    internalChange.current = false
+    lastKnownPoints.current = points
+  })
+
+  const pushHistory = useCallback((prev) => {
+    internalChange.current = true
+    undoStack.current.push(prev)
+    redoStack.current = []
+    forceUpdate(n => n + 1)
+  }, [])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -199,48 +227,85 @@ export default function FieldMap({
 
   const handleClick = (e) => {
     e.preventDefault()
+    pushHistory(points)
     onChange([...points, getCanvasPoint(e)])
   }
 
-  const handleUndo  = (e) => { e.stopPropagation(); onChange(points.slice(0, -1)) }
-  const handleClear = (e) => { e.stopPropagation(); onChange([]) }
+  const handleUndo = (e) => {
+    e.stopPropagation()
+    if (undoStack.current.length === 0) return
+    const prev = undoStack.current.pop()
+    redoStack.current.push(points)
+    internalChange.current = true
+    forceUpdate(n => n + 1)
+    onChange(prev)
+  }
+
+  const handleRedo = (e) => {
+    e.stopPropagation()
+    if (redoStack.current.length === 0) return
+    const next = redoStack.current.pop()
+    undoStack.current.push(points)
+    internalChange.current = true
+    forceUpdate(n => n + 1)
+    onChange(next)
+  }
+
+  const handleClear = (e) => {
+    e.stopPropagation()
+    if (points.length === 0) return
+    pushHistory(points)
+    onChange([])
+  }
 
   return (
-    <div className="field-map-wrapper" ref={containerRef}>
-      <img
-        ref={imgRef}
-        src="/2026-field.png"
-        alt=""
-        style={{ display: 'none' }}
-        onLoad={draw}
-      />
-      <canvas
-        ref={canvasRef}
-        className="field-map-canvas"
-        onClick={handleClick}
-        onTouchEnd={(e) => {
-          e.preventDefault()
-          const touch = e.changedTouches[0]
-          if (!touch) return
-          const canvas = canvasRef.current
-          const rect = canvas.getBoundingClientRect()
-          onChange([...points, {
-            x: (touch.clientX - rect.left) / rect.width,
-            y: (touch.clientY - rect.top) / rect.height,
-          }])
-        }}
-      />
+    <div className="field-map-outer">
+      <div className="field-map-wrapper" ref={containerRef}>
+        <img
+          ref={imgRef}
+          src="/2026-field.png"
+          alt=""
+          style={{ display: 'none' }}
+          onLoad={draw}
+        />
+        <canvas
+          ref={canvasRef}
+          className="field-map-canvas"
+          onClick={handleClick}
+          onTouchEnd={(e) => {
+            e.preventDefault()
+            const touch = e.changedTouches[0]
+            if (!touch) return
+            const canvas = canvasRef.current
+            const rect = canvas.getBoundingClientRect()
+            pushHistory(points)
+            onChange([...points, {
+              x: (touch.clientX - rect.left) / rect.width,
+              y: (touch.clientY - rect.top) / rect.height,
+            }])
+          }}
+        />
+      </div>
       <div className="field-map-controls">
+        <span className="field-map-count">{points.length} pt{points.length !== 1 ? 's' : ''}</span>
         <button
           type="button"
           className="field-map-btn"
           onClick={handleUndo}
-          disabled={points.length === 0}
-          title="Undo last point"
+          disabled={undoStack.current.length === 0}
+          title="Undo"
         >
-          Undo
+          ↩ Undo
         </button>
-        <span className="field-map-count">{points.length} pt{points.length !== 1 ? 's' : ''}</span>
+        <button
+          type="button"
+          className="field-map-btn"
+          onClick={handleRedo}
+          disabled={redoStack.current.length === 0}
+          title="Redo"
+        >
+          Redo ↪
+        </button>
         <button
           type="button"
           className="field-map-btn danger"
