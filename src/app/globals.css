@@ -3581,3 +3581,645 @@ button { cursor: pointer; font-family: inherit; }
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* ── Prescouting ─────────────────────────────────────────────────────────── */
+
+/* Field reference image */
+.prescout-field-preview {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+}
+
+/* Phase progress bar */
+.prescout-phasebar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 0.5rem 0 1rem;
+}
+
+.prescout-phase-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.prescout-phase-step.active {
+  color: var(--text);
+}
+
+.prescout-phase-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.prescout-phase-step.active .prescout-phase-dot {
+  background: var(--bean-teal);
+  border-color: var(--bean-teal);
+  color: #fff;
+}
+
+.prescout-phase-label {
+  white-space: nowrap;
+}
+
+.prescout-phase-line {
+  flex: 1;
+  height: 1.5px;
+  background: var(--border);
+  margin: 0 0.3rem;
+  transition: background 0.2s;
+}
+
+.prescout-phase-line.active {
+  background: var(--bean-teal);
+}
+
+/* Section card */
+.prescout-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.prescout-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.65rem;
+}
+
+.prescout-subsection {
+  margin-bottom: 0;
+}
+
+.prescout-subsection-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+/* Cycle counter grid */
+.prescout-cycle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+
+.prescout-cycle-btn {
+  position: relative;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.4rem 1.2rem;
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  gap: 0.15rem;
+  transition: border-color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescout-cycle-btn:active {
+  border-color: var(--bean-teal);
+  background: var(--bean-teal-dim);
+}
+
+.prescout-cycle-btn--pass {
+  background: rgba(27,151,173,0.08);
+  border-color: rgba(27,151,173,0.4);
+}
+
+.prescout-cycle-btn--pass:active {
+  background: var(--bean-teal-dim);
+  border-color: var(--bean-teal);
+}
+
+.prescout-cycle-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.prescout-cycle-count {
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text);
+  line-height: 1;
+}
+
+.prescout-cycle-dec {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 3px 5px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: color 0.1s;
+}
+
+.prescout-cycle-dec:hover {
+  color: var(--text-muted);
+}
+
+/* Zone selector */
+.prescout-zone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.prescout-zone-btn {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescout-zone-btn.active {
+  border-color: var(--bean-teal);
+  color: var(--bean-teal);
+  background: var(--bean-teal-dim);
+}
+
+/* Climb selector */
+.prescout-climb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.prescout-climb-level {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescout-climb-level.active {
+  border-color: var(--bean-teal);
+  color: var(--bean-teal);
+  background: var(--bean-teal-dim);
+}
+
+.prescout-mark-btn {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.prescout-mark-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.prescout-mark-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.prescout-climb-time {
+  font-size: 0.73rem;
+  color: var(--bean-teal);
+  font-family: var(--font-mono);
+}
+
+/* Field crossings counters */
+.prescout-counters-row {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.prescout-counter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.prescout-counter-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.prescout-counter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.prescout-counter-btn {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  width: 38px;
+  height: 38px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescout-counter-btn:active {
+  border-color: var(--accent);
+}
+
+.prescout-counter-val {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  min-width: 2rem;
+  text-align: center;
+}
+
+/* Passing */
+.prescout-passing-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.prescout-passing-toggle {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescout-passing-toggle.active {
+  border-color: var(--bean-teal);
+  color: var(--bean-teal);
+  background: var(--bean-teal-dim);
+}
+
+.prescout-pass-timer {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--bean-teal);
+}
+
+.prescout-pass-panel {
+  background: var(--bg);
+  border: 1px solid rgba(27,151,173,0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  margin-top: 0.65rem;
+}
+
+.prescout-pass-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-bottom: 0.6rem;
+}
+
+.prescout-pass-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.prescout-pass-chip {
+  background: var(--bean-teal-dim);
+  border: 1px solid rgba(27,151,173,0.3);
+  border-radius: 4px;
+  color: var(--bean-teal);
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  font-family: var(--font-mono);
+}
+
+/* Navigation row */
+.prescout-nav {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  align-items: stretch;
+}
+
+.prescout-back-btn {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 0.6rem 1rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s, color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescout-back-btn:hover {
+  border-color: var(--border-focus);
+  color: var(--text);
+}
+
+.prescout-next-btn {
+  flex: 1;
+  margin: 0;
+}
+
+/* Misc hints */
+.prescout-loading-hint {
+  margin-left: 0.5rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.prescout-event-name {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.prescout-event-error {
+  font-size: 0.78rem;
+  color: var(--bean-red);
+  margin-top: 0.25rem;
+}
+
+/* CSV export button (used in AnalysisDashboard) */
+.prescout-csv-btn {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.prescout-csv-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Analysis table container */
+.prescouting-analysis {
+  overflow-x: auto;
+}
+
+/* ── Prescouting assignments panel (AnalysisDashboard) ──────────────────── */
+.assign-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.assign-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.assign-panel-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.assign-input-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin-bottom: 0.9rem;
+}
+
+.assign-textarea {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.5rem 0.65rem;
+  resize: vertical;
+  min-height: 64px;
+}
+
+.assign-textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.assign-parse-btn {
+  background: var(--bg-card-hover);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.12s;
+}
+
+.assign-parse-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.assign-parse-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.assign-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.assign-table-header {
+  display: grid;
+  grid-template-columns: 80px 1fr 36px;
+  gap: 0.5rem;
+  padding: 0.4rem 0.65rem;
+  background: var(--bg);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+
+.assign-table-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 36px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.assign-table-row:last-child {
+  border-bottom: none;
+}
+
+.assign-team-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.assign-scout-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 0.25rem 0.5rem;
+  width: 100%;
+  cursor: pointer;
+}
+
+.assign-scout-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.assign-remove-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.assign-remove-btn:hover {
+  color: var(--bean-red);
+  border-color: var(--bean-red);
+}
+
+.assign-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.assign-summary {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.assign-empty {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 0.75rem 0;
+}
+
+/* ── Assignments box in PrescoutingForm setup ────────────────────────────── */
+.prescout-assignments-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.prescout-assignment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.prescout-assign-chip {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescout-assign-chip:hover,
+.prescout-assign-chip.active {
+  border-color: var(--bean-teal);
+  color: var(--bean-teal);
+  background: var(--bean-teal-dim);
+}

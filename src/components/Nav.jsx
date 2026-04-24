@@ -87,6 +87,12 @@ export default function Nav() {
                 >
                   Picklist
                 </Link>
+                <Link
+                  href="/prescouting"
+                  className={`nav-link${pathname === '/prescouting' ? ' active' : ''}`}
+                >
+                  Prescouting
+                </Link>
               </>
             )}
 
@@ -196,6 +202,12 @@ export default function Nav() {
                   className={`mobile-menu-link${pathname === '/picklist' ? ' active' : ''}`}
                 >
                   Picklist
+                </Link>
+                <Link
+                  href="/prescouting"
+                  className={`mobile-menu-link${pathname === '/prescouting' ? ' active' : ''}`}
+                >
+                  Prescouting
                 </Link>
               </>
             )}

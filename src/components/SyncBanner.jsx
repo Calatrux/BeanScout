@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { getUnsyncedCount, getUnsyncedQualEntries, getUnsyncedTeamNotes, getUnsyncedPicklists, markQualEntrySynced, markTeamNoteSynced, markPicklistSynced } from '@/lib/indexeddb'
+import { getUnsyncedCount, getUnsyncedQualEntries, getUnsyncedTeamNotes, getUnsyncedPicklists, markQualEntrySynced, markTeamNoteSynced, markPicklistSynced, getUnsyncedPrescoutingEntries, markPrescoutingEntrySynced } from '@/lib/indexeddb'
 import { supabase } from '@/lib/supabase'
 
 export default function SyncBanner() {
@@ -95,16 +95,18 @@ export default function SyncBanner() {
         return
       }
       console.log('[SyncBanner] Starting sync...')
-      const [qualEntries, teamNotes, picklists] = await Promise.all([
+      const [qualEntries, teamNotes, picklists, prescoutingEntries] = await Promise.all([
         getUnsyncedQualEntries(),
         getUnsyncedTeamNotes(),
         getUnsyncedPicklists(),
+        getUnsyncedPrescoutingEntries(),
       ])
 
       console.log('[SyncBanner] Found entries to sync:', {
         qualEntries: qualEntries.length,
         teamNotes: teamNotes.length,
-        picklists: picklists.length
+        picklists: picklists.length,
+        prescoutingEntries: prescoutingEntries.length,
       })
 
       // Sync qual entries
@@ -160,6 +162,25 @@ export default function SyncBanner() {
           }
         } catch (err) {
           console.error('[SyncBanner] Error syncing picklist:', err)
+          failCount++
+        }
+      }
+
+      // Sync prescouting entries
+      for (const entry of prescoutingEntries) {
+        try {
+          const { id, synced: _s, ...record } = entry
+          console.log('[SyncBanner] Syncing prescouting entry:', id)
+          const { error } = await supabase.from('prescouting').upsert({ id, ...record })
+          if (error) {
+            console.error('[SyncBanner] Prescouting entry sync failed:', id, error.message)
+            failCount++
+          } else {
+            await markPrescoutingEntrySynced(id)
+            successCount++
+          }
+        } catch (err) {
+          console.error('[SyncBanner] Error syncing prescouting entry:', err)
           failCount++
         }
       }

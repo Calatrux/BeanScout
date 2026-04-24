@@ -24,7 +24,16 @@ export default function AnalysisDashboard() {
   // Data state
   const [qualData, setQualData] = useState([])
   const [teamNotes, setTeamNotes] = useState([])
+  const [prescoutingData, setPrescoutingData] = useState([])
   const [loadingData, setLoadingData] = useState(false)
+
+  // Assignment state
+  const [scouts, setScouts] = useState([])
+  const [assignments, setAssignments] = useState([]) // [{team_number, assigned_to}]
+  const [assignInput, setAssignInput] = useState('')
+  const [assignStatus, setAssignStatus] = useState(null)
+  const [savingAssignments, setSavingAssignments] = useState(false)
+  const [loadingAssignments, setLoadingAssignments] = useState(false)
 
   // Rankings tab state
   const [expandedTeam, setExpandedTeam] = useState(null)
@@ -178,27 +187,100 @@ export default function AnalysisDashboard() {
     return () => clearTimeout(timer)
   }, [eventKey, loadEventData])
 
-  // Load analysis data when event loads
+  // Load rankings/autons/notes when TBA event teams load
   useEffect(() => {
     if (eventKey && eventTeams.length > 0) {
       loadAnalysisData(eventKey)
     }
   }, [eventKey, eventTeams.length])
 
+  // Load prescouting data independently (no TBA dependency)
+  useEffect(() => {
+    if (!eventKey || eventKey.length < 4) return
+    supabase.from('prescouting').select('*').eq('event_key', eventKey).order('match_number')
+      .then(({ data }) => setPrescoutingData(data || []))
+  }, [eventKey])
+
   const loadAnalysisData = async (key) => {
     setLoadingData(true)
     try {
-      const [qualResult, notesResult] = await Promise.all([
+      const [qualResult, notesResult, prescoutResult] = await Promise.all([
         supabase.from('qual_scouting').select('*').eq('event_key', key).order('match_number'),
         supabase.from('team_notes').select('*').eq('event_key', key).order('created_at', { ascending: false }),
+        supabase.from('prescouting').select('*').eq('event_key', key).order('match_number'),
       ])
 
       setQualData(qualResult.data || [])
       setTeamNotes(notesResult.data || [])
+      setPrescoutingData(prescoutResult.data || [])
     } catch (err) {
       console.error('[Admin] Failed to load analysis data:', err)
     } finally {
       setLoadingData(false)
+    }
+  }
+
+  // Load scouts + assignments when prescouting tab opens
+  useEffect(() => {
+    if (activeTab === 'prescouting' && eventKey && isAdmin) {
+      loadScoutsAndAssignments(eventKey)
+    }
+  }, [activeTab, eventKey, isAdmin])
+
+  const loadScoutsAndAssignments = async (key) => {
+    setLoadingAssignments(true)
+    try {
+      const [scoutResult, assignResult] = await Promise.all([
+        supabase.from('profiles').select('id, username, first_name, last_name').or('is_scouter.eq.true,is_admin.eq.true').order('first_name'),
+        supabase.from('prescouting_assignments').select('team_number, assigned_to').eq('event_key', key),
+      ])
+      setScouts(scoutResult.data || [])
+      setAssignments((assignResult.data || []).map(a => ({ team_number: a.team_number, assigned_to: a.assigned_to })))
+    } catch (err) {
+      console.error('[Admin] Failed to load scouts/assignments:', err)
+    } finally {
+      setLoadingAssignments(false)
+    }
+  }
+
+  const handleParseTeams = () => {
+    const nums = assignInput
+      .split(/[\s,\n]+/)
+      .map(s => parseInt(s.trim(), 10))
+      .filter(n => !isNaN(n) && n > 0)
+    const existing = new Set(assignments.map(a => a.team_number))
+    const newEntries = nums.filter(n => !existing.has(n)).map(n => ({ team_number: n, assigned_to: '' }))
+    setAssignments(prev => [...prev, ...newEntries])
+    setAssignInput('')
+  }
+
+  const handleAssignScout = (team_number, assigned_to) => {
+    setAssignments(prev => prev.map(a => a.team_number === team_number ? { ...a, assigned_to } : a))
+  }
+
+  const handleRemoveAssignment = (team_number) => {
+    setAssignments(prev => prev.filter(a => a.team_number !== team_number))
+  }
+
+  const handleSaveAssignments = async () => {
+    if (!eventKey) return
+    setSavingAssignments(true)
+    setAssignStatus(null)
+    try {
+      // Delete all existing assignments for this event, then re-insert
+      await supabase.from('prescouting_assignments').delete().eq('event_key', eventKey)
+      const toInsert = assignments
+        .filter(a => a.assigned_to)
+        .map(a => ({ event_key: eventKey, team_number: a.team_number, assigned_to: a.assigned_to }))
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from('prescouting_assignments').insert(toInsert)
+        if (error) throw error
+      }
+      setAssignStatus({ type: 'success', message: `Saved ${toInsert.length} assignment${toInsert.length !== 1 ? 's' : ''}.` })
+    } catch (err) {
+      setAssignStatus({ type: 'error', message: `Save failed: ${err.message}` })
+    } finally {
+      setSavingAssignments(false)
     }
   }
 
@@ -621,8 +703,8 @@ export default function AnalysisDashboard() {
         </div>
       )}
 
-      {/* Tabs */}
-      {eventTeams.length > 0 && (
+      {/* Tabs — shown whenever a valid event key is entered */}
+      {eventKey && eventKey.length >= 4 && (
         <>
           <div className="analysis-tabs">
             <button
@@ -646,9 +728,17 @@ export default function AnalysisDashboard() {
             >
               Autons
             </button>
+            <button
+              type="button"
+              className={`analysis-tab${activeTab === 'prescouting' ? ' active' : ''}`}
+              onClick={() => setActiveTab('prescouting')}
+            >
+              Prescouting
+            </button>
           </div>
 
-          {loadingData ? (
+          {/* Prescouting is independent — no loadingData gate */}
+          {activeTab === 'prescouting' ? null : loadingData ? (
             <div className="loading-text">
               <span className="loading-spinner" />
               Loading analysis data...
@@ -1186,10 +1276,227 @@ export default function AnalysisDashboard() {
               {activeTab === 'autons' && (
                 <AutonsTab qualData={qualData} onRefresh={() => loadAnalysisData(eventKey)} />
               )}
+
             </>
+          )}
+
+          {/* Prescouting tab — independent of TBA/loadingData */}
+          {activeTab === 'prescouting' && (
+            <div className="prescouting-analysis">
+              {/* ── Team Assignments ──────────────────────────────────── */}
+              <div className="assign-panel">
+                <div className="assign-panel-header">
+                  <span className="assign-panel-title">Team Assignments</span>
+                  {prescoutingData.length > 0 && (
+                    <button
+                      type="button"
+                      className="prescout-csv-btn"
+                      onClick={() => exportPrescoutingCSV(prescoutingData, eventKey)}
+                    >
+                      Export CSV
+                    </button>
+                  )}
+                </div>
+
+                {loadingAssignments ? (
+                  <div className="loading-text" style={{ padding: '1rem 0' }}>
+                    <span className="loading-spinner" /> Loading…
+                  </div>
+                ) : (
+                  <>
+                    <div className="assign-input-row">
+                      <textarea
+                        className="assign-textarea"
+                        placeholder={"Paste team numbers (comma or newline separated)\ne.g. 1833, 2056, 254"}
+                        value={assignInput}
+                        onChange={e => setAssignInput(e.target.value)}
+                        rows={3}
+                      />
+                      <button
+                        type="button"
+                        className="assign-parse-btn"
+                        onClick={handleParseTeams}
+                        disabled={!assignInput.trim()}
+                      >
+                        Add Teams
+                      </button>
+                    </div>
+
+                    {assignStatus && (
+                      <div className={`status ${assignStatus.type}`} style={{ marginBottom: '0.75rem' }}>
+                        {assignStatus.message}
+                      </div>
+                    )}
+
+                    {assignments.length > 0 ? (
+                      <>
+                        <div className="assign-table">
+                          <div className="assign-table-header">
+                            <span>Team</span>
+                            <span>Assigned To</span>
+                            <span />
+                          </div>
+                          {assignments
+                            .slice()
+                            .sort((a, b) => a.team_number - b.team_number)
+                            .map(a => (
+                              <div key={a.team_number} className="assign-table-row">
+                                <span className="assign-team-num">{a.team_number}</span>
+                                <select
+                                  className="assign-scout-select"
+                                  value={a.assigned_to}
+                                  onChange={e => handleAssignScout(a.team_number, e.target.value)}
+                                >
+                                  <option value="">— Unassigned —</option>
+                                  {scouts.map(s => (
+                                    <option key={s.username} value={s.username}>
+                                      {s.first_name} {s.last_name} (@{s.username})
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  className="assign-remove-btn"
+                                  onClick={() => handleRemoveAssignment(a.team_number)}
+                                  title="Remove"
+                                >×</button>
+                              </div>
+                            ))
+                          }
+                        </div>
+                        <div className="assign-footer">
+                          <span className="assign-summary">
+                            {assignments.filter(a => a.assigned_to).length} / {assignments.length} assigned
+                          </span>
+                          <button
+                            type="button"
+                            className="submit-btn"
+                            style={{ minWidth: '120px', margin: 0 }}
+                            onClick={handleSaveAssignments}
+                            disabled={savingAssignments}
+                          >
+                            {savingAssignments ? 'Saving…' : 'Save Assignments'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="assign-empty">No teams added yet. Paste a list above to get started.</p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* ── Scouting Data ─────────────────────────────────────── */}
+              {prescoutingData.length === 0 ? (
+                <div className="analysis-empty">
+                  <p>No prescouting data yet</p>
+                  <p className="hint">Data appears after scouters submit prescouting entries.</p>
+                </div>
+              ) : (
+                <PrescoutingAnalysis data={prescoutingData} />
+              )}
+            </div>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ── Prescouting CSV export ────────────────────────────────────────────────────
+function exportPrescoutingCSV(data, eventKey) {
+  const headers = [
+    'team_number','event_key','match_number','alliance','scouter_name',
+    'auto_start_position','auto_end_position',
+    'auto_10_cycles','auto_20_cycles','auto_35_cycles','auto_40_cycles','auto_50_cycles','auto_60_cycles',
+    'auto_climb_level','auto_climb_time',
+    'teleop_10_cycles','teleop_20_cycles','teleop_35_cycles','teleop_40_cycles','teleop_50_cycles','teleop_60_cycles',
+    'pass_10_cycles','pass_20_cycles','pass_35_cycles','pass_40_cycles','pass_50_cycles','pass_60_cycles',
+    'total_pass_time','trench_count','bump_count',
+    'endgame_climb_level','endgame_climb_time',
+  ]
+  const rows = data.map(e =>
+    headers.map(h => {
+      const v = e[h]
+      if (v === null || v === undefined) return ''
+      if (typeof v === 'string' && (v.includes(',') || v.includes('"'))) return `"${v.replace(/"/g, '""')}"`
+      return v
+    }).join(',')
+  )
+  const csv  = [headers.join(','), ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `prescouting-${eventKey}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── Prescouting aggregation table ─────────────────────────────────────────────
+const PRESCOUT_CYCLE_KEYS = [10, 20, 35, 40, 50, 60]
+
+function PrescoutingAnalysis({ data }) {
+  const teams = {}
+  for (const entry of data) {
+    const t = entry.team_number
+    if (!teams[t]) teams[t] = { team_number: t, entries: [] }
+    teams[t].entries.push(entry)
+  }
+
+  const avg = (arr) => arr.length ? (arr.reduce((s, v) => s + (v || 0), 0) / arr.length).toFixed(1) : '—'
+  const rows = Object.values(teams).sort((a, b) => a.team_number - b.team_number)
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'left' }}>Team</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>Matches</th>
+            {PRESCOUT_CYCLE_KEYS.map(k => (
+              <th key={`a${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>A{k}+</th>
+            ))}
+            {PRESCOUT_CYCLE_KEYS.map(k => (
+              <th key={`t${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>T{k}+</th>
+            ))}
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>PassT(s)</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>Trench</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>Bump</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>EG Climb</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ team_number, entries }) => (
+            <tr key={team_number} style={{ borderBottom: '1px solid var(--border)' }}>
+              <td style={{ padding: '0.5rem 0.4rem', fontWeight: 600 }}>{team_number}</td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>{entries.length}</td>
+              {PRESCOUT_CYCLE_KEYS.map(k => (
+                <td key={`a${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                  {avg(entries.map(e => e[`auto_${k}_cycles`]))}
+                </td>
+              ))}
+              {PRESCOUT_CYCLE_KEYS.map(k => (
+                <td key={`t${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                  {avg(entries.map(e => e[`teleop_${k}_cycles`]))}
+                </td>
+              ))}
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.map(e => e.total_pass_time))}
+              </td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.map(e => e.trench_count))}
+              </td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.map(e => e.bump_count))}
+              </td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.filter(e => e.endgame_climb_level).map(e => e.endgame_climb_level))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
