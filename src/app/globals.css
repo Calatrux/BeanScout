@@ -3829,6 +3829,11 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 .prescout-climb-time {
+  display: inline-block;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  border-radius: 999px;
+  background: rgba(45, 212, 191, 0.08);
   font-size: 0.73rem;
   color: var(--bean-teal);
   font-family: var(--font-mono);
@@ -3997,6 +4002,44 @@ button { cursor: pointer; font-family: inherit; }
   font-size: 0.78rem;
   color: var(--bean-red);
   margin-top: 0.25rem;
+}
+
+/* Alliance selector (PrescoutingForm setup) */
+.prescout-alliance-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.prescout-alliance-btn {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.prescout-alliance-btn:hover {
+  border-color: var(--border-focus);
+  color: var(--text);
+}
+
+.prescout-alliance-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.prescout-alliance-btn--red.active {
+  border-color: rgba(239, 68, 68, 0.9);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.prescout-alliance-btn--blue.active {
+  border-color: rgba(59, 130, 246, 0.9);
+  background: rgba(59, 130, 246, 0.12);
 }
 
 /* CSV export button (used in AnalysisDashboard) */

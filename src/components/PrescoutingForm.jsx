@@ -196,7 +196,7 @@ function ClimbSelector({ level, onLevelChange, climbTime, onMarkTime }) {
       </button>
       {climbTime && (
         <span className="prescout-climb-time">
-          @ {new Date(climbTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          {new Date(climbTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
       )}
     </div>
@@ -230,6 +230,7 @@ export default function PrescoutingForm() {
   const [teamNumber,      setTeamNumber]      = useState('')
   const [eventKey,        setEventKey]        = useState('')
   const [matchNumber,     setMatchNumber]     = useState('')
+  const [alliance,        setAlliance]        = useState('')
   const [eventInfo,       setEventInfo]       = useState(null)
   const [loadingEvent,    setLoadingEvent]    = useState(false)
   const [eventError,      setEventError]      = useState(null)
@@ -347,6 +348,7 @@ export default function PrescoutingForm() {
       event_key:             eventKey.trim().toLowerCase(),
       team_number:           parseInt(teamNumber, 10),
       match_number:          parseInt(matchNumber, 10),
+      alliance:              alliance || null,
       scouter_name:          scouterName,
       auto_start_position:   autoStartZone  || null,
       auto_end_position:     autoEndZone    || null,
@@ -405,6 +407,7 @@ export default function PrescoutingForm() {
     setPassingActive(false); passAccumRef.current = 0; setTotalPassTime(0)
     setTrenchCount(0); setBumpCount(0)
     setTeamNumber(''); setMatchNumber('')
+    setAlliance('')
     setSubmitting(false)
   }
 
@@ -462,6 +465,26 @@ export default function PrescoutingForm() {
             />
           </div>
 
+          <div className="field">
+            <label className="field-label">Alliance Color</label>
+            <div className="prescout-alliance-row" role="group" aria-label="Alliance color">
+              <button
+                type="button"
+                className={`prescout-alliance-btn prescout-alliance-btn--red${alliance === 'red' ? ' active' : ''}`}
+                onClick={() => setAlliance('red')}
+              >
+                Red
+              </button>
+              <button
+                type="button"
+                className={`prescout-alliance-btn prescout-alliance-btn--blue${alliance === 'blue' ? ' active' : ''}`}
+                onClick={() => setAlliance('blue')}
+              >
+                Blue
+              </button>
+            </div>
+          </div>
+
           {myAssignments.length > 0 && (
             <div className="prescout-assignments-box">
               <div className="prescout-section-title">Your Assigned Teams</div>
@@ -483,7 +506,7 @@ export default function PrescoutingForm() {
           <button
             type="button"
             className="submit-btn"
-            disabled={!teamNumber || !eventKey || !matchNumber}
+            disabled={!teamNumber || !eventKey || !matchNumber || !alliance}
             onClick={() => setPhase('auton')}
           >
             Start Scouting →

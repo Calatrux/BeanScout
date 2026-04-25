@@ -25,6 +25,7 @@ export default function AnalysisDashboard() {
   const [qualData, setQualData] = useState([])
   const [teamNotes, setTeamNotes] = useState([])
   const [prescoutingData, setPrescoutingData] = useState([])
+  const [exportingAllPrescouting, setExportingAllPrescouting] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
 
   // Assignment state
@@ -226,6 +227,25 @@ export default function AnalysisDashboard() {
       loadScoutsAndAssignments(eventKey)
     }
   }, [activeTab, eventKey, isAdmin])
+
+  const handleExportAllPrescoutingCSV = async () => {
+    if (exportingAllPrescouting) return
+    setExportingAllPrescouting(true)
+    try {
+      const { data, error } = await supabase
+        .from('prescouting')
+        .select('*')
+        .order('event_key')
+        .order('match_number')
+      if (error) throw error
+      exportPrescoutingCSV(data || [], 'all-events')
+    } catch (err) {
+      console.error('[AnalysisDashboard] Failed to export all prescouting CSV:', err)
+      setStatus({ type: 'warning', message: 'Export failed. Please try again.' })
+    } finally {
+      setExportingAllPrescouting(false)
+    }
+  }
 
   const loadScoutsAndAssignments = async (key) => {
     setLoadingAssignments(true)
@@ -1287,15 +1307,25 @@ export default function AnalysisDashboard() {
               <div className="assign-panel">
                 <div className="assign-panel-header">
                   <span className="assign-panel-title">Team Assignments</span>
-                  {prescoutingData.length > 0 && (
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
                     <button
                       type="button"
                       className="prescout-csv-btn"
-                      onClick={() => exportPrescoutingCSV(prescoutingData, eventKey)}
+                      onClick={handleExportAllPrescoutingCSV}
+                      disabled={exportingAllPrescouting}
                     >
-                      Export CSV
+                      {exportingAllPrescouting ? 'Exportingâ€¦' : 'Export All CSV'}
                     </button>
-                  )}
+                    {prescoutingData.length > 0 && (
+                      <button
+                        type="button"
+                        className="prescout-csv-btn"
+                        onClick={() => exportPrescoutingCSV(prescoutingData, eventKey)}
+                      >
+                        Export Event CSV
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {loadingAssignments ? (
