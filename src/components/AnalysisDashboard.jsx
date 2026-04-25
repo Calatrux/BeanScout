@@ -251,13 +251,21 @@ export default function AnalysisDashboard() {
     setLoadingAssignments(true)
     try {
       const [scoutResult, assignResult] = await Promise.all([
-        supabase.from('profiles').select('id, username, first_name, last_name').or('is_scouter.eq.true,is_admin.eq.true').order('first_name'),
+        supabase
+          .from('profiles')
+          .select('id, username, first_name, last_name')
+          .order('first_name', { ascending: true })
+          .order('last_name', { ascending: true })
+          .order('username', { ascending: true }),
         supabase.from('prescouting_assignments').select('team_number, assigned_to').eq('event_key', key),
       ])
-      setScouts(scoutResult.data || [])
+      if (scoutResult.error) throw scoutResult.error
+      const allProfiles = (scoutResult.data || []).filter(p => p?.username)
+      setScouts(allProfiles)
       setAssignments((assignResult.data || []).map(a => ({ team_number: a.team_number, assigned_to: a.assigned_to })))
     } catch (err) {
       console.error('[Admin] Failed to load scouts/assignments:', err)
+      setAssignStatus({ type: 'error', message: `Could not load users: ${err.message}` })
     } finally {
       setLoadingAssignments(false)
     }
