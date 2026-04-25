@@ -60,7 +60,7 @@ CREATE TABLE prescouting (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   event_key TEXT NOT NULL,
   team_number INT NOT NULL,
-  match_number INT NOT NULL,
+  match_number TEXT NOT NULL,
   scouter_name TEXT NOT NULL,
   -- Auton
   auto_start_position TEXT,

@@ -173,7 +173,7 @@ function ZoneSelector({ value, onChange, label }) {
 }
 
 // ── Climb selector ────────────────────────────────────────────────────────────
-function ClimbSelector({ level, onLevelChange, climbTime, onMarkTime }) {
+function ClimbSelector({ level, onLevelChange }) {
   return (
     <div className="prescout-climb-row">
       {[null, 1, 2, 3].map(l => (
@@ -186,19 +186,6 @@ function ClimbSelector({ level, onLevelChange, climbTime, onMarkTime }) {
           {l === null ? 'None' : `L${l}`}
         </button>
       ))}
-      <button
-        type="button"
-        className="prescout-mark-btn"
-        onClick={onMarkTime}
-        disabled={level === null}
-      >
-        Mark Time
-      </button>
-      {climbTime && (
-        <span className="prescout-climb-time">
-          {new Date(climbTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-        </span>
-      )}
     </div>
   )
 }
@@ -241,7 +228,6 @@ export default function PrescoutingForm() {
   const [autoEndZone,    setAutoEndZone]    = useState(null)
   const [autoCycles,     setAutoCycles]     = useState(makeCycles())
   const [autoClimbLevel, setAutoClimbLevel] = useState(null)
-  const [autoClimbTime,  setAutoClimbTime]  = useState(null)
 
   // Teleop
   const [teleopCycles,      setTeleopCycles]      = useState(makeCycles())
@@ -254,7 +240,6 @@ export default function PrescoutingForm() {
   const [trenchCount,       setTrenchCount]       = useState(0)
   const [bumpCount,         setBumpCount]         = useState(0)
   const [endgameClimbLevel, setEndgameClimbLevel] = useState(null)
-  const [endgameClimbTime,  setEndgameClimbTime]  = useState(null)
 
   // Form status
   const [status,     setStatus]     = useState(null)
@@ -343,15 +328,15 @@ export default function PrescoutingForm() {
     const finalPassTime = passAccumRef.current
 
     const id = crypto.randomUUID()
-    const entry = {
-      id,
-      event_key:             eventKey.trim().toLowerCase(),
-      team_number:           parseInt(teamNumber, 10),
-      match_number:          parseInt(matchNumber, 10),
-      alliance:              alliance || null,
-      scouter_name:          scouterName,
-      auto_start_position:   autoStartZone  || null,
-      auto_end_position:     autoEndZone    || null,
+      const entry = {
+        id,
+        event_key:             eventKey.trim().toLowerCase(),
+        team_number:           parseInt(teamNumber, 10),
+        match_number:          matchNumber.trim(),
+        alliance:              alliance || null,
+        scouter_name:          scouterName,
+        auto_start_position:   autoStartZone  || null,
+        auto_end_position:     autoEndZone    || null,
       auto_10_cycles:        autoCycles[10],
       auto_20_cycles:        autoCycles[20],
       auto_35_cycles:        autoCycles[35],
@@ -359,7 +344,7 @@ export default function PrescoutingForm() {
       auto_50_cycles:        autoCycles[50],
       auto_60_cycles:        autoCycles[60],
       auto_climb_level:      autoClimbLevel,
-      auto_climb_time:       autoClimbTime  || null,
+      auto_climb_time:       null,
       teleop_10_cycles:      teleopCycles[10],
       teleop_20_cycles:      teleopCycles[20],
       teleop_35_cycles:      teleopCycles[35],
@@ -376,7 +361,7 @@ export default function PrescoutingForm() {
       trench_count:          trenchCount,
       bump_count:            bumpCount,
       endgame_climb_level:   endgameClimbLevel,
-      endgame_climb_time:    endgameClimbTime || null,
+      endgame_climb_time:    null,
       created_at:            new Date().toISOString(),
       synced:                false,
     }
@@ -402,8 +387,8 @@ export default function PrescoutingForm() {
     setPhase('setup')
     setAutoStartZone(null); setAutoEndZone(null)
     setAutoCycles(makeCycles()); setTeleopCycles(makeCycles()); setPassCycles(makeCycles())
-    setAutoClimbLevel(null); setAutoClimbTime(null)
-    setEndgameClimbLevel(null); setEndgameClimbTime(null)
+    setAutoClimbLevel(null)
+    setEndgameClimbLevel(null)
     setPassingActive(false); passAccumRef.current = 0; setTotalPassTime(0)
     setTrenchCount(0); setBumpCount(0)
     setTeamNumber(''); setMatchNumber('')
@@ -458,8 +443,8 @@ export default function PrescoutingForm() {
             <label className="field-label">Match Number</label>
             <input
               className="field-input"
-              type="number"
-              placeholder="e.g. 12"
+              type="text"
+              placeholder="e.g. qm12, sf1m1"
               value={matchNumber}
               onChange={e => setMatchNumber(e.target.value)}
             />
@@ -535,8 +520,6 @@ export default function PrescoutingForm() {
             <ClimbSelector
               level={autoClimbLevel}
               onLevelChange={setAutoClimbLevel}
-              climbTime={autoClimbTime}
-              onMarkTime={() => setAutoClimbTime(new Date().toISOString())}
             />
           </Section>
 
@@ -614,8 +597,6 @@ export default function PrescoutingForm() {
             <ClimbSelector
               level={endgameClimbLevel}
               onLevelChange={setEndgameClimbLevel}
-              climbTime={endgameClimbTime}
-              onMarkTime={() => setEndgameClimbTime(new Date().toISOString())}
             />
           </Section>
 

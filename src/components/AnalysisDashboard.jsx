@@ -28,14 +28,6 @@ export default function AnalysisDashboard() {
   const [exportingAllPrescouting, setExportingAllPrescouting] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
 
-  // Assignment state
-  const [scouts, setScouts] = useState([])
-  const [assignments, setAssignments] = useState([]) // [{team_number, assigned_to}]
-  const [assignInput, setAssignInput] = useState('')
-  const [assignStatus, setAssignStatus] = useState(null)
-  const [savingAssignments, setSavingAssignments] = useState(false)
-  const [loadingAssignments, setLoadingAssignments] = useState(false)
-
   // Rankings tab state
   const [expandedTeam, setExpandedTeam] = useState(null)
 
@@ -221,13 +213,6 @@ export default function AnalysisDashboard() {
     }
   }
 
-  // Load scouts + assignments when prescouting tab opens
-  useEffect(() => {
-    if (activeTab === 'prescouting' && eventKey && isAdmin) {
-      loadScoutsAndAssignments(eventKey)
-    }
-  }, [activeTab, eventKey, isAdmin])
-
   const handleExportAllPrescoutingCSV = async () => {
     if (exportingAllPrescouting) return
     setExportingAllPrescouting(true)
@@ -244,71 +229,6 @@ export default function AnalysisDashboard() {
       setStatus({ type: 'warning', message: 'Export failed. Please try again.' })
     } finally {
       setExportingAllPrescouting(false)
-    }
-  }
-
-  const loadScoutsAndAssignments = async (key) => {
-    setLoadingAssignments(true)
-    try {
-      const [scoutResult, assignResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, username, first_name, last_name')
-          .order('first_name', { ascending: true })
-          .order('last_name', { ascending: true })
-          .order('username', { ascending: true }),
-        supabase.from('prescouting_assignments').select('team_number, assigned_to').eq('event_key', key),
-      ])
-      if (scoutResult.error) throw scoutResult.error
-      const allProfiles = (scoutResult.data || []).filter(p => p?.username)
-      setScouts(allProfiles)
-      setAssignments((assignResult.data || []).map(a => ({ team_number: a.team_number, assigned_to: a.assigned_to })))
-    } catch (err) {
-      console.error('[Admin] Failed to load scouts/assignments:', err)
-      setAssignStatus({ type: 'error', message: `Could not load users: ${err.message}` })
-    } finally {
-      setLoadingAssignments(false)
-    }
-  }
-
-  const handleParseTeams = () => {
-    const nums = assignInput
-      .split(/[\s,\n]+/)
-      .map(s => parseInt(s.trim(), 10))
-      .filter(n => !isNaN(n) && n > 0)
-    const existing = new Set(assignments.map(a => a.team_number))
-    const newEntries = nums.filter(n => !existing.has(n)).map(n => ({ team_number: n, assigned_to: '' }))
-    setAssignments(prev => [...prev, ...newEntries])
-    setAssignInput('')
-  }
-
-  const handleAssignScout = (team_number, assigned_to) => {
-    setAssignments(prev => prev.map(a => a.team_number === team_number ? { ...a, assigned_to } : a))
-  }
-
-  const handleRemoveAssignment = (team_number) => {
-    setAssignments(prev => prev.filter(a => a.team_number !== team_number))
-  }
-
-  const handleSaveAssignments = async () => {
-    if (!eventKey) return
-    setSavingAssignments(true)
-    setAssignStatus(null)
-    try {
-      // Delete all existing assignments for this event, then re-insert
-      await supabase.from('prescouting_assignments').delete().eq('event_key', eventKey)
-      const toInsert = assignments
-        .filter(a => a.assigned_to)
-        .map(a => ({ event_key: eventKey, team_number: a.team_number, assigned_to: a.assigned_to }))
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from('prescouting_assignments').insert(toInsert)
-        if (error) throw error
-      }
-      setAssignStatus({ type: 'success', message: `Saved ${toInsert.length} assignment${toInsert.length !== 1 ? 's' : ''}.` })
-    } catch (err) {
-      setAssignStatus({ type: 'error', message: `Save failed: ${err.message}` })
-    } finally {
-      setSavingAssignments(false)
     }
   }
 
@@ -1311,116 +1231,23 @@ export default function AnalysisDashboard() {
           {/* Prescouting tab — independent of TBA/loadingData */}
           {activeTab === 'prescouting' && (
             <div className="prescouting-analysis">
-              {/* ── Team Assignments ──────────────────────────────────── */}
-              <div className="assign-panel">
-                <div className="assign-panel-header">
-                  <span className="assign-panel-title">Team Assignments</span>
-                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      className="prescout-csv-btn"
-                      onClick={handleExportAllPrescoutingCSV}
-                      disabled={exportingAllPrescouting}
-                    >
-                      {exportingAllPrescouting ? 'Exportingâ€¦' : 'Export All CSV'}
-                    </button>
-                    {prescoutingData.length > 0 && (
-                      <button
-                        type="button"
-                        className="prescout-csv-btn"
-                        onClick={() => exportPrescoutingCSV(prescoutingData, eventKey)}
-                      >
-                        Export Event CSV
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {loadingAssignments ? (
-                  <div className="loading-text" style={{ padding: '1rem 0' }}>
-                    <span className="loading-spinner" /> Loading…
-                  </div>
-                ) : (
-                  <>
-                    <div className="assign-input-row">
-                      <textarea
-                        className="assign-textarea"
-                        placeholder={"Paste team numbers (comma or newline separated)\ne.g. 1833, 2056, 254"}
-                        value={assignInput}
-                        onChange={e => setAssignInput(e.target.value)}
-                        rows={3}
-                      />
-                      <button
-                        type="button"
-                        className="assign-parse-btn"
-                        onClick={handleParseTeams}
-                        disabled={!assignInput.trim()}
-                      >
-                        Add Teams
-                      </button>
-                    </div>
-
-                    {assignStatus && (
-                      <div className={`status ${assignStatus.type}`} style={{ marginBottom: '0.75rem' }}>
-                        {assignStatus.message}
-                      </div>
-                    )}
-
-                    {assignments.length > 0 ? (
-                      <>
-                        <div className="assign-table">
-                          <div className="assign-table-header">
-                            <span>Team</span>
-                            <span>Assigned To</span>
-                            <span />
-                          </div>
-                          {assignments
-                            .slice()
-                            .sort((a, b) => a.team_number - b.team_number)
-                            .map(a => (
-                              <div key={a.team_number} className="assign-table-row">
-                                <span className="assign-team-num">{a.team_number}</span>
-                                <select
-                                  className="assign-scout-select"
-                                  value={a.assigned_to}
-                                  onChange={e => handleAssignScout(a.team_number, e.target.value)}
-                                >
-                                  <option value="">— Unassigned —</option>
-                                  {scouts.map(s => (
-                                    <option key={s.username} value={s.username}>
-                                      {s.first_name} {s.last_name} (@{s.username})
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  type="button"
-                                  className="assign-remove-btn"
-                                  onClick={() => handleRemoveAssignment(a.team_number)}
-                                  title="Remove"
-                                >×</button>
-                              </div>
-                            ))
-                          }
-                        </div>
-                        <div className="assign-footer">
-                          <span className="assign-summary">
-                            {assignments.filter(a => a.assigned_to).length} / {assignments.length} assigned
-                          </span>
-                          <button
-                            type="button"
-                            className="submit-btn"
-                            style={{ minWidth: '120px', margin: 0 }}
-                            onClick={handleSaveAssignments}
-                            disabled={savingAssignments}
-                          >
-                            {savingAssignments ? 'Saving…' : 'Save Assignments'}
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="assign-empty">No teams added yet. Paste a list above to get started.</p>
-                    )}
-                  </>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginBottom: '1rem' }}>
+                <button
+                  type="button"
+                  className="prescout-csv-btn"
+                  onClick={handleExportAllPrescoutingCSV}
+                  disabled={exportingAllPrescouting}
+                >
+                  {exportingAllPrescouting ? 'Exporting…' : 'Export All CSV'}
+                </button>
+                {prescoutingData.length > 0 && (
+                  <button
+                    type="button"
+                    className="prescout-csv-btn"
+                    onClick={() => exportPrescoutingCSV(prescoutingData, eventKey)}
+                  >
+                    Export Event CSV
+                  </button>
                 )}
               </div>
 
