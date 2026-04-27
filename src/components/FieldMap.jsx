@@ -8,9 +8,6 @@ const GRID_COLS = 20
 const GRID_ROWS = 12
 
 // ─── Zone layout (normalized 0–1, defined for BLUE/left side) ───────────────
-// Red side mirrors these: x_red = 1 − x_blue
-// Boxes are sized to sit over the actual field elements in 2026-field.png
-
 export const FEATURE_ZONES = [
   { label: 'Trench', xMin: 0.15, xMax: 0.34, yMin: 0.00, yMax: 0.18 },
   { label: 'Bump',   xMin: 0.15, xMax: 0.34, yMin: 0.20, yMax: 0.38 },
@@ -20,38 +17,55 @@ export const FEATURE_ZONES = [
 ]
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Returns { left, right } canvas x-coords for a zone x-range
-function xRange(xMin, xMax, isBlue, width) {
-  if (isBlue) return { left: xMin * width, right: xMax * width }
-  return { left: (1 - xMax) * width, right: (1 - xMin) * width }
-}
-
 export default function FieldMap({
   points,
   onChange,
   color = '#1B97AD',
   alliance = 'blue',
-  ghostPoints = [],
+  // Array of { matchNum, path } — last N autons for this team (for overlay dropdown)
+  historyPaths = [],
 }) {
   const canvasRef = useRef(null)
   const imgRef = useRef(null)
   const containerRef = useRef(null)
 
-  // Undo/redo stacks — store snapshots of the points array
+  // ── Flip preferences (persisted) ─────────────────────────────────────────
+  const [flipH, setFlipHState] = useState(() => {
+    try { return localStorage.getItem('bs_flip_h') === '1' } catch { return false }
+  })
+  const [flipV, setFlipVState] = useState(() => {
+    try { return localStorage.getItem('bs_flip_v') === '1' } catch { return false }
+  })
+
+  const setFlipH = (val) => {
+    setFlipHState(val)
+    try { localStorage.setItem('bs_flip_h', val ? '1' : '0') } catch {}
+  }
+  const setFlipV = (val) => {
+    setFlipVState(val)
+    try { localStorage.setItem('bs_flip_v', val ? '1' : '0') } catch {}
+  }
+
+  // ── History selection ─────────────────────────────────────────────────────
+  // selectedHistoryIdx: which historyPaths entry is shown in the dropdown
+  const [selectedHistoryIdx, setSelectedHistoryIdx] = useState(null)
+  // isHistorySeed: true when points were just loaded from history — next click
+  // starts a fresh path instead of appending
+  const isHistorySeed = useRef(false)
+
+  // ── Undo / redo ───────────────────────────────────────────────────────────
   const undoStack = useRef([])
   const redoStack = useRef([])
-  // Track last points ref so we can detect external (parent-driven) changes
   const lastKnownPoints = useRef(points)
-  const [, forceUpdate] = useState(0)  // used to re-render when stacks change
-
-  // If the parent changes points externally (e.g. "same as previous" toggle),
-  // wipe history so undo/redo don't produce surprising results.
-  // We use a separate flag ref to distinguish internal vs external updates.
+  const [, forceUpdate] = useState(0)
   const internalChange = useRef(false)
+
   useEffect(() => {
     if (!internalChange.current && points !== lastKnownPoints.current) {
       undoStack.current = []
       redoStack.current = []
+      isHistorySeed.current = false
+      setSelectedHistoryIdx(null)
       forceUpdate(n => n + 1)
     }
     internalChange.current = false
@@ -65,6 +79,7 @@ export default function FieldMap({
     forceUpdate(n => n + 1)
   }, [])
 
+  // ── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
     const canvas = canvasRef.current
     const img = imgRef.current
@@ -77,10 +92,19 @@ export default function FieldMap({
 
     ctx.clearRect(0, 0, width, height)
 
-    // Field image
-    ctx.drawImage(img, 0, 0, width, height)
+    // Coordinate helpers: normalized (0–1) → canvas px, with flip applied
+    const cx = (nx) => flipH ? (1 - nx) * width  : nx * width
+    const cy = (ny) => flipV ? (1 - ny) * height : ny * height
 
-    // Grid overlay
+    // Field image — flip by transforming the context, then restore
+    ctx.save()
+    if      (flipH && flipV) { ctx.scale(-1, -1); ctx.translate(-width, -height) }
+    else if (flipH)          { ctx.scale(-1,  1); ctx.translate(-width, 0) }
+    else if (flipV)          { ctx.scale( 1, -1); ctx.translate(0, -height) }
+    ctx.drawImage(img, 0, 0, width, height)
+    ctx.restore()
+
+    // Grid (symmetric — looks identical when flipped)
     ctx.save()
     ctx.strokeStyle = 'rgba(255,255,255,0.12)'
     ctx.lineWidth = 0.5
@@ -94,11 +118,14 @@ export default function FieldMap({
     }
     ctx.restore()
 
-    // ── Feature zone boxes ─────────────────────────────────────────────────
+    // Feature zone boxes — compute positions through cx/cy so flip applies
     FEATURE_ZONES.forEach(zone => {
-      const { left, right } = xRange(zone.xMin, zone.xMax, isBlue, width)
-      const top = zone.yMin * height
-      const h = (zone.yMax - zone.yMin) * height
+      const nxL = isBlue ? zone.xMin : (1 - zone.xMax)
+      const nxR = isBlue ? zone.xMax : (1 - zone.xMin)
+      const left  = Math.min(cx(nxL), cx(nxR))
+      const right = Math.max(cx(nxL), cx(nxR))
+      const top   = Math.min(cy(zone.yMin), cy(zone.yMax))
+      const h     = Math.abs(cy(zone.yMax) - cy(zone.yMin))
 
       ctx.save()
       ctx.strokeStyle = `${allianceColor}0.75)`
@@ -110,45 +137,16 @@ export default function FieldMap({
       ctx.font = 'bold 9px sans-serif'
       ctx.fillStyle = `${allianceColor}0.9)`
       ctx.textBaseline = 'top'
-      ctx.textAlign = isBlue ? 'left' : 'right'
-      const labelX = isBlue ? left + 3 : right - 3
-      ctx.fillText(zone.label, labelX, top + 3)
+      // Label aligns to the "near" edge (where the alliance starts)
+      const labelLeft = isBlue !== flipH
+      ctx.textAlign = labelLeft ? 'left' : 'right'
+      ctx.fillText(zone.label, labelLeft ? left + 3 : right - 3, top + 3)
       ctx.restore()
     })
 
-    // ── Ghost path (previous auton silhouette, tinted to alliance color) ──
-    if (ghostPoints && ghostPoints.length > 0) {
-      const gPts = ghostPoints.map(p => ({ x: p.x * width, y: p.y * height }))
-      const ghostColor = isBlue ? 'rgba(59,130,246,' : 'rgba(239,68,68,'
-      if (gPts.length > 1) {
-        ctx.save()
-        ctx.strokeStyle = `${ghostColor}0.35)`
-        ctx.lineWidth = LINE_WIDTH
-        ctx.lineJoin = 'round'
-        ctx.lineCap = 'round'
-        ctx.setLineDash([5, 5])
-        ctx.beginPath()
-        ctx.moveTo(gPts[0].x, gPts[0].y)
-        for (let i = 1; i < gPts.length; i++) ctx.lineTo(gPts[i].x, gPts[i].y)
-        ctx.stroke()
-        ctx.setLineDash([])
-        ctx.restore()
-      }
-      gPts.forEach(pt => {
-        ctx.save()
-        ctx.beginPath()
-        ctx.arc(pt.x, pt.y, POINT_RADIUS - 1, 0, Math.PI * 2)
-        ctx.strokeStyle = `${ghostColor}0.4)`
-        ctx.lineWidth = 1.5
-        ctx.stroke()
-        ctx.restore()
-      })
-    }
-
     if (points.length === 0) return
 
-    // Convert normalized points to canvas coords
-    const pts = points.map(p => ({ x: p.x * width, y: p.y * height }))
+    const pts = points.map(p => ({ x: cx(p.x), y: cy(p.y) }))
 
     // Connecting lines
     if (pts.length > 1) {
@@ -166,7 +164,7 @@ export default function FieldMap({
       ctx.restore()
     }
 
-    // Points
+    // Dots + numbers
     pts.forEach((pt, i) => {
       ctx.save()
       ctx.beginPath()
@@ -192,14 +190,13 @@ export default function FieldMap({
       ctx.fillText(i + 1, pt.x, pt.y)
       ctx.restore()
     })
-  }, [points, color, alliance, ghostPoints])
+  }, [points, color, alliance, flipH, flipV])
 
-  // Resize canvas to match container
+  // Resize observer
   useEffect(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
-
     const observer = new ResizeObserver(() => {
       canvas.width = container.clientWidth
       canvas.height = container.clientHeight
@@ -208,32 +205,42 @@ export default function FieldMap({
     observer.observe(container)
     canvas.width = container.clientWidth
     canvas.height = container.clientHeight
-
     return () => observer.disconnect()
   }, [draw])
 
   useEffect(() => { draw() }, [draw])
 
-  const getCanvasPoint = (e) => {
+  // ── Input handlers ────────────────────────────────────────────────────────
+  const getPoint = (clientX, clientY) => {
     const canvas = canvasRef.current
     const rect = canvas.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
-    return {
-      x: (clientX - rect.left) / rect.width,
-      y: (clientY - rect.top) / rect.height,
-    }
+    let x = (clientX - rect.left) / rect.width
+    let y = (clientY - rect.top) / rect.height
+    if (flipH) x = 1 - x
+    if (flipV) y = 1 - y
+    return { x, y }
   }
 
   const handleClick = (e) => {
     e.preventDefault()
+    const newPoint = getPoint(e.clientX, e.clientY)
+    if (isHistorySeed.current) {
+      isHistorySeed.current = false
+      setSelectedHistoryIdx(null)
+      internalChange.current = true
+      undoStack.current = []
+      redoStack.current = []
+      forceUpdate(n => n + 1)
+      onChange([newPoint])
+      return
+    }
     pushHistory(points)
-    onChange([...points, getCanvasPoint(e)])
+    onChange([...points, newPoint])
   }
 
   const handleUndo = (e) => {
     e.stopPropagation()
-    if (undoStack.current.length === 0) return
+    if (!undoStack.current.length) return
     const prev = undoStack.current.pop()
     redoStack.current.push(points)
     internalChange.current = true
@@ -243,7 +250,7 @@ export default function FieldMap({
 
   const handleRedo = (e) => {
     e.stopPropagation()
-    if (redoStack.current.length === 0) return
+    if (!redoStack.current.length) return
     const next = redoStack.current.pop()
     undoStack.current.push(points)
     internalChange.current = true
@@ -253,7 +260,7 @@ export default function FieldMap({
 
   const handleClear = (e) => {
     e.stopPropagation()
-    if (points.length === 0) return
+    if (!points.length) return
     pushHistory(points)
     onChange([])
   }
@@ -276,45 +283,91 @@ export default function FieldMap({
             e.preventDefault()
             const touch = e.changedTouches[0]
             if (!touch) return
-            const canvas = canvasRef.current
-            const rect = canvas.getBoundingClientRect()
+            const newPoint = getPoint(touch.clientX, touch.clientY)
+            if (isHistorySeed.current) {
+              isHistorySeed.current = false
+              setSelectedHistoryIdx(null)
+              internalChange.current = true
+              undoStack.current = []
+              redoStack.current = []
+              forceUpdate(n => n + 1)
+              onChange([newPoint])
+              return
+            }
             pushHistory(points)
-            onChange([...points, {
-              x: (touch.clientX - rect.left) / rect.width,
-              y: (touch.clientY - rect.top) / rect.height,
-            }])
+            onChange([...points, newPoint])
           }}
         />
       </div>
+
       <div className="field-map-controls">
-        <span className="field-map-count">{points.length} pt{points.length !== 1 ? 's' : ''}</span>
+        {/* Previous auton selector */}
+        {historyPaths.length > 0 && (
+          <select
+            className="field-map-history-select"
+            value={selectedHistoryIdx ?? ''}
+            onChange={e => {
+              const idx = e.target.value === '' ? null : Number(e.target.value)
+              setSelectedHistoryIdx(idx)
+              if (idx !== null && historyPaths[idx]) {
+                internalChange.current = true
+                isHistorySeed.current = true
+                undoStack.current = []
+                redoStack.current = []
+                forceUpdate(n => n + 1)
+                onChange(historyPaths[idx].path)
+              } else {
+                isHistorySeed.current = false
+              }
+            }}
+            title="Load a previous auton path (click field to start a new one)"
+          >
+            <option value="">Select Auton</option>
+            {historyPaths.map((h, i) => (
+              <option key={i} value={i}>M{h.matchNum}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Flip buttons */}
         <button
           type="button"
-          className="field-map-btn"
+          className={`field-map-btn icon${flipH ? ' active' : ''}`}
+          onClick={() => setFlipH(!flipH)}
+          title="Flip field left ↔ right"
+        >⟺</button>
+        <button
+          type="button"
+          className={`field-map-btn icon${flipV ? ' active' : ''}`}
+          onClick={() => setFlipV(!flipV)}
+          title="Flip field top ↕ bottom"
+        >↕</button>
+
+        <span className="field-map-divider" />
+
+        {/* Edit controls */}
+        <button
+          type="button"
+          className="field-map-btn icon"
           onClick={handleUndo}
           disabled={undoStack.current.length === 0}
           title="Undo"
-        >
-          ↩ Undo
-        </button>
+        >↩</button>
         <button
           type="button"
-          className="field-map-btn"
+          className="field-map-btn icon"
           onClick={handleRedo}
           disabled={redoStack.current.length === 0}
           title="Redo"
-        >
-          Redo ↪
-        </button>
+        >↪</button>
+        <span className="field-map-count">{points.length} pt{points.length !== 1 ? 's' : ''}</span>
         <button
           type="button"
           className="field-map-btn danger"
           onClick={handleClear}
           disabled={points.length === 0}
           title="Clear all points"
-        >
-          Clear
-        </button>
+        >Clear</button>
       </div>
     </div>
   )

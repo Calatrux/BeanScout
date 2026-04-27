@@ -3007,8 +3007,8 @@ button { cursor: pointer; font-family: inherit; }
    ============================================ */
 
 .team-tags-section {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
 }
 
@@ -3022,94 +3022,69 @@ button { cursor: pointer; font-family: inherit; }
   margin-bottom: 12px;
 }
 
-.tags-container {
+/* Category pill row — all 4 categories in one horizontal bar */
+.tags-category-row {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
-.tag-category {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tag-category-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 12px;
+.tag-category-pill {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
-.tag-category-header:hover {
+.tag-category-pill:hover {
   border-color: var(--accent);
   color: var(--text);
   background: var(--accent-dim);
 }
 
-.tag-category-header.expanded {
+.tag-category-pill.expanded {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-dim);
 }
 
-.tag-category-header.has-selected {
+.tag-category-pill.has-selected {
   border-color: var(--accent);
   background: var(--accent-dim);
-}
-
-.tag-category-label {
-  flex: 1;
-  text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.tag-category-count {
-  font-size: 0.6875rem;
   color: var(--accent);
-  font-weight: 600;
-  margin-left: 8px;
 }
 
-.tag-category-icon {
-  font-size: 0.875rem;
+.tag-pill-count {
+  background: var(--accent);
+  color: white;
+  border-radius: 9999px;
+  font-size: 0.6rem;
   font-weight: 700;
-  color: var(--text-dim);
-  margin-left: 8px;
-  min-width: 16px;
-  text-align: center;
-}
-
-.tag-category-header.expanded .tag-category-icon {
-  color: var(--accent);
-}
-
-.tag-buttons-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding-left: 12px;
-  margin-top: 2px;
+  padding: 0 5px;
+  line-height: 1.6;
 }
 
 .tag-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
+  margin-top: 6px;
 }
 
 .tag-btn {
@@ -3123,6 +3098,7 @@ button { cursor: pointer; font-family: inherit; }
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  touch-action: manipulation;
 }
 
 .tag-btn:hover {
@@ -3138,12 +3114,6 @@ button { cursor: pointer; font-family: inherit; }
   font-weight: 600;
 }
 
-.tag-btn.preview {
-  font-size: 0.6875rem;
-  padding: 2px 6px;
-  opacity: 0.9;
-}
-
 /* Mobile adjustments for tags */
 @media (max-width: 767px) {
   .tag-btn {
@@ -3152,28 +3122,14 @@ button { cursor: pointer; font-family: inherit; }
     min-height: 36px;
   }
 
-  .tag-btn.preview {
-    padding: 4px 8px;
-    font-size: 0.75rem;
-    min-height: 32px;
-  }
-
-  .tag-buttons, .tag-buttons-preview {
+  .tag-buttons {
     gap: 8px;
   }
 
-  .tag-category {
-    gap: 8px;
-  }
-
-  .tag-category-header {
-    padding: 10px 14px;
-    font-size: 0.8125rem;
-  }
-
-  .tag-category-icon {
-    font-size: 1rem;
-    min-width: 18px;
+  .tag-category-pill {
+    padding: 7px 8px;
+    font-size: 0.6875rem;
+    min-height: 36px;
   }
 }
 
@@ -3213,33 +3169,72 @@ button { cursor: pointer; font-family: inherit; }
 .field-map-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .field-map-count {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  margin-right: auto;
+  margin-left: auto;
+}
+
+.field-map-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.field-map-history-select {
+  font-size: 0.75rem;
+  padding: 5px 6px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  max-width: 90px;
 }
 
 .field-map-btn {
-  font-size: 0.8rem;
-  padding: 7px 14px;
-  min-height: 36px;
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  height: 32px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-muted);
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   touch-action: manipulation;
+  white-space: nowrap;
+}
+
+.field-map-btn.icon {
+  padding: 5px 8px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.field-map-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .field-map-btn:hover:not(:disabled) {
   background: var(--bg-card-hover);
   color: var(--text);
   border-color: var(--border-focus);
+}
+
+.field-map-btn.active:hover:not(:disabled) {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .field-map-btn:disabled {
@@ -3251,26 +3246,6 @@ button { cursor: pointer; font-family: inherit; }
   background: var(--red-dim);
   color: var(--red);
   border-color: var(--red-border);
-}
-
-/* Midline checkbox row (below field map in qual scout) */
-.midline-checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  user-select: none;
-}
-
-.midline-checkbox-row input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--accent);
-  cursor: pointer;
-  flex-shrink: 0;
 }
 
 /* Note card field map (analysis view) */

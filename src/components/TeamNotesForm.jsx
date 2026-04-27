@@ -295,7 +295,7 @@ export default function TeamNotesForm() {
                       checked={team.isUpdate}
                       onChange={(e) => updateFlag(index, 'isUpdate', e.target.checked)}
                     />
-                    Update
+                    Significant Update
                   </label>
                   <label className="status-checkbox-label">
                     <input
@@ -303,7 +303,7 @@ export default function TeamNotesForm() {
                       checked={team.noChange}
                       onChange={(e) => updateFlag(index, 'noChange', e.target.checked)}
                     />
-                    No significant change
+                    No Significant Change
                   </label>
                 </div>
               </div>

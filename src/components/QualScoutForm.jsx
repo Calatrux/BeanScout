@@ -64,7 +64,6 @@ function makeTeams(numbers) {
     crossesMidline: false,
     startingPosition: null,
     endLocation: null,
-    sameAsPrevious: false,
   }))
 }
 
@@ -214,13 +213,16 @@ export default function QualScoutForm() {
           const relevant = entries
             .filter(e => e.alliance === alliance && [e.team1_number, e.team2_number, e.team3_number].includes(num))
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-          if (!relevant.length) return
-          const e = relevant[0]
-          const path =
-            e.team1_number === num ? (e.team1_path || []) :
-            e.team2_number === num ? (e.team2_path || []) :
-                                     (e.team3_path || [])
-          if (path.length > 0) newPrev[num] = path
+          const history = []
+          for (const e of relevant) {
+            if (history.length >= 3) break
+            const path =
+              e.team1_number === num ? (e.team1_path || []) :
+              e.team2_number === num ? (e.team2_path || []) :
+                                       (e.team3_path || [])
+            if (path.length > 0) history.push({ matchNum: e.match_number, path })
+          }
+          if (history.length > 0) newPrev[num] = history
         })
         if (!cancelled) setPrevPaths(newPrev)
       } catch (err) {
@@ -276,24 +278,6 @@ export default function QualScoutForm() {
     setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, crossesMidline: value } : t)))
   }
 
-  const toggleSameAsPrevious = (index, checked) => {
-    const team = teams[index]
-    const prev = prevPaths[team.number] || []
-    if (checked) {
-      const start = detectZone(prev[0] ?? null, alliance)
-      const end = detectZone(prev[prev.length - 1] ?? null, alliance)
-      setTeams(ts => ts.map((t, i) => i === index
-        ? { ...t, sameAsPrevious: true, path: prev, startingPosition: start.position, endLocation: end.label }
-        : t
-      ))
-    } else {
-      setTeams(ts => ts.map((t, i) => i === index
-        ? { ...t, sameAsPrevious: false, path: [], startingPosition: null, endLocation: null }
-        : t
-      ))
-    }
-  }
-
   const toggleTagCategory = (category) => {
     setExpandedTagCategory(expandedTagCategory === category ? null : category)
   }
@@ -340,7 +324,7 @@ export default function QualScoutForm() {
   }
 
   // Touch drag handlers for mobile
-  const handleTouchStart = (e, index) => {
+  const handleTouchStart = (_e, index) => {
     dragRef.current = index
     setDraggedIndex(index)
   }
@@ -655,97 +639,64 @@ export default function QualScoutForm() {
               <div className="team-field-map-section">
                 <div className="field-map-section-header">
                   <label className="tags-label">Auton Path</label>
-                  {prevPaths[team.number] && (
-                    <label className="same-as-prev-label">
-                      <input
-                        type="checkbox"
-                        checked={team.sameAsPrevious || false}
-                        onChange={(e) => toggleSameAsPrevious(index, e.target.checked)}
-                      />
-                      Same as previous
-                    </label>
-                  )}
+                  <label className="same-as-prev-label">
+                    <input
+                      type="checkbox"
+                      checked={team.crossesMidline || false}
+                      onChange={(e) => updateCrossesMidline(index, e.target.checked)}
+                    />
+                    Crossed midline (auton)
+                  </label>
                 </div>
                 <FieldMap
                   points={team.path || []}
                   onChange={(newPath) => updatePath(index, newPath)}
                   color={alliance === 'red' ? '#ef4444' : '#3b82f6'}
                   alliance={alliance}
-                  ghostPoints={!team.sameAsPrevious ? (prevPaths[team.number] || []) : []}
+                  historyPaths={prevPaths[team.number] || []}
                 />
-                <label className="midline-checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={team.crossesMidline || false}
-                    onChange={(e) => updateCrossesMidline(index, e.target.checked)}
-                  />
-                  Crossed midline (auton)
-                </label>
               </div>
 
               {/* Characterization Tags */}
               <div className="team-tags-section">
-                <label className="tags-label">Quick Tags</label>
-                <div className="tags-container">
+                <div className="tags-category-row">
                   {Object.entries(CHARACTERIZATION_TAGS).map(([category, tags]) => {
                     const selectedTags = (team.tags || []).filter(tag => tags.includes(tag))
-                    const isExpanded = expandedTagCategory === category
-
+                    const isExpanded = expandedTagCategory === `${index}-${category}`
                     return (
-                      <div key={category} className="tag-category">
-                        <button
-                          type="button"
-                          className={`tag-category-header${isExpanded ? ' expanded' : ''}${selectedTags.length > 0 ? ' has-selected' : ''}`}
-                          onClick={() => toggleTagCategory(category)}
-                        >
-                          <span className="tag-category-label">
-                            {category.charAt(0).toUpperCase() + category.slice(1)}
-                          </span>
-                          {selectedTags.length > 0 && (
-                            <span className="tag-category-count">({selectedTags.length})</span>
-                          )}
-                          <span className="tag-category-icon">
-                            {isExpanded ? '−' : '+'}
-                          </span>
-                        </button>
-
-                        {/* Show selected tags when collapsed */}
-                        {!isExpanded && selectedTags.length > 0 && (
-                          <div className="tag-buttons-preview">
-                            {selectedTags.map(tag => (
-                              <button
-                                key={tag}
-                                type="button"
-                                className="tag-btn active preview"
-                                onClick={() => toggleTag(index, tag)}
-                                title={`Remove ${tag}`}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
+                      <button
+                        key={category}
+                        type="button"
+                        className={`tag-category-pill${isExpanded ? ' expanded' : ''}${selectedTags.length > 0 ? ' has-selected' : ''}`}
+                        onClick={() => setExpandedTagCategory(
+                          isExpanded ? null : `${index}-${category}`
                         )}
-
-                        {/* Show all tags when expanded */}
-                        {isExpanded && (
-                          <div className="tag-buttons">
-                            {tags.map(tag => (
-                              <button
-                                key={tag}
-                                type="button"
-                                className={`tag-btn${(team.tags || []).includes(tag) ? ' active' : ''}`}
-                                onClick={() => toggleTag(index, tag)}
-                                title={tag}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
+                      >
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                        {selectedTags.length > 0 && (
+                          <span className="tag-pill-count">{selectedTags.length}</span>
                         )}
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
+                {Object.entries(CHARACTERIZATION_TAGS).map(([category, tags]) => {
+                  if (expandedTagCategory !== `${index}-${category}`) return null
+                  return (
+                    <div key={category} className="tag-buttons">
+                      {tags.map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={`tag-btn${(team.tags || []).includes(tag) ? ' active' : ''}`}
+                          onClick={() => toggleTag(index, tag)}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ))}
