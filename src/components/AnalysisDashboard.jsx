@@ -24,6 +24,8 @@ export default function AnalysisDashboard() {
   // Data state
   const [qualData, setQualData] = useState([])
   const [teamNotes, setTeamNotes] = useState([])
+  const [prescoutingData, setPrescoutingData] = useState([])
+  const [exportingAllPrescouting, setExportingAllPrescouting] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
 
   // Rankings tab state
@@ -178,27 +180,55 @@ export default function AnalysisDashboard() {
     return () => clearTimeout(timer)
   }, [eventKey, loadEventData])
 
-  // Load analysis data when event loads
+  // Load rankings/autons/notes when TBA event teams load
   useEffect(() => {
     if (eventKey && eventTeams.length > 0) {
       loadAnalysisData(eventKey)
     }
   }, [eventKey, eventTeams.length])
 
+  // Load prescouting data independently (no TBA dependency)
+  useEffect(() => {
+    if (!eventKey || eventKey.length < 4) return
+    supabase.from('prescouting').select('*').eq('event_key', eventKey).order('match_number')
+      .then(({ data }) => setPrescoutingData(data || []))
+  }, [eventKey])
+
   const loadAnalysisData = async (key) => {
     setLoadingData(true)
     try {
-      const [qualResult, notesResult] = await Promise.all([
+      const [qualResult, notesResult, prescoutResult] = await Promise.all([
         supabase.from('qual_scouting').select('*').eq('event_key', key).order('match_number'),
         supabase.from('team_notes').select('*').eq('event_key', key).order('created_at', { ascending: false }),
+        supabase.from('prescouting').select('*').eq('event_key', key).order('match_number'),
       ])
 
       setQualData(qualResult.data || [])
       setTeamNotes(notesResult.data || [])
+      setPrescoutingData(prescoutResult.data || [])
     } catch (err) {
       console.error('[Admin] Failed to load analysis data:', err)
     } finally {
       setLoadingData(false)
+    }
+  }
+
+  const handleExportAllPrescoutingCSV = async () => {
+    if (exportingAllPrescouting) return
+    setExportingAllPrescouting(true)
+    try {
+      const { data, error } = await supabase
+        .from('prescouting')
+        .select('*')
+        .order('event_key')
+        .order('match_number')
+      if (error) throw error
+      exportPrescoutingCSV(data || [], 'all-events')
+    } catch (err) {
+      console.error('[AnalysisDashboard] Failed to export all prescouting CSV:', err)
+      setStatus({ type: 'warning', message: 'Export failed. Please try again.' })
+    } finally {
+      setExportingAllPrescouting(false)
     }
   }
 
@@ -621,8 +651,8 @@ export default function AnalysisDashboard() {
         </div>
       )}
 
-      {/* Tabs */}
-      {eventTeams.length > 0 && (
+      {/* Tabs — shown whenever a valid event key is entered */}
+      {eventKey && eventKey.length >= 4 && (
         <>
           <div className="analysis-tabs">
             <button
@@ -646,9 +676,17 @@ export default function AnalysisDashboard() {
             >
               Autons
             </button>
+            <button
+              type="button"
+              className={`analysis-tab${activeTab === 'prescouting' ? ' active' : ''}`}
+              onClick={() => setActiveTab('prescouting')}
+            >
+              Prescouting
+            </button>
           </div>
 
-          {loadingData ? (
+          {/* Prescouting is independent — no loadingData gate */}
+          {activeTab === 'prescouting' ? null : loadingData ? (
             <div className="loading-text">
               <span className="loading-spinner" />
               Loading analysis data...
@@ -1186,10 +1224,144 @@ export default function AnalysisDashboard() {
               {activeTab === 'autons' && (
                 <AutonsTab qualData={qualData} onRefresh={() => loadAnalysisData(eventKey)} />
               )}
+
             </>
+          )}
+
+          {/* Prescouting tab — independent of TBA/loadingData */}
+          {activeTab === 'prescouting' && (
+            <div className="prescouting-analysis">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginBottom: '1rem' }}>
+                <button
+                  type="button"
+                  className="prescout-csv-btn"
+                  onClick={handleExportAllPrescoutingCSV}
+                  disabled={exportingAllPrescouting}
+                >
+                  {exportingAllPrescouting ? 'Exporting…' : 'Export All CSV'}
+                </button>
+                {prescoutingData.length > 0 && (
+                  <button
+                    type="button"
+                    className="prescout-csv-btn"
+                    onClick={() => exportPrescoutingCSV(prescoutingData, eventKey)}
+                  >
+                    Export Event CSV
+                  </button>
+                )}
+              </div>
+
+              {/* ── Scouting Data ─────────────────────────────────────── */}
+              {prescoutingData.length === 0 ? (
+                <div className="analysis-empty">
+                  <p>No prescouting data yet</p>
+                  <p className="hint">Data appears after scouters submit prescouting entries.</p>
+                </div>
+              ) : (
+                <PrescoutingAnalysis data={prescoutingData} />
+              )}
+            </div>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ── Prescouting CSV export ────────────────────────────────────────────────────
+function exportPrescoutingCSV(data, eventKey) {
+  const headers = [
+    'team_number','event_key','match_number','alliance','scouter_name',
+    'auto_start_position','auto_end_position',
+    'auto_10_cycles','auto_20_cycles','auto_35_cycles','auto_40_cycles','auto_50_cycles','auto_60_cycles',
+    'auto_climb_level','auto_climb_time',
+    'teleop_10_cycles','teleop_20_cycles','teleop_35_cycles','teleop_40_cycles','teleop_50_cycles','teleop_60_cycles',
+    'pass_10_cycles','pass_20_cycles','pass_35_cycles','pass_40_cycles','pass_50_cycles','pass_60_cycles',
+    'total_pass_time','trench_count','bump_count',
+    'endgame_climb_level','endgame_climb_time',
+  ]
+  const rows = data.map(e =>
+    headers.map(h => {
+      const v = e[h]
+      if (v === null || v === undefined) return ''
+      if (typeof v === 'string' && (v.includes(',') || v.includes('"'))) return `"${v.replace(/"/g, '""')}"`
+      return v
+    }).join(',')
+  )
+  const csv  = [headers.join(','), ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `prescouting-${eventKey}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ── Prescouting aggregation table ─────────────────────────────────────────────
+const PRESCOUT_CYCLE_KEYS = [10, 20, 35, 40, 50, 60]
+
+function PrescoutingAnalysis({ data }) {
+  const teams = {}
+  for (const entry of data) {
+    const t = entry.team_number
+    if (!teams[t]) teams[t] = { team_number: t, entries: [] }
+    teams[t].entries.push(entry)
+  }
+
+  const avg = (arr) => arr.length ? (arr.reduce((s, v) => s + (v || 0), 0) / arr.length).toFixed(1) : '—'
+  const rows = Object.values(teams).sort((a, b) => a.team_number - b.team_number)
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'left' }}>Team</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>Matches</th>
+            {PRESCOUT_CYCLE_KEYS.map(k => (
+              <th key={`a${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>A{k}+</th>
+            ))}
+            {PRESCOUT_CYCLE_KEYS.map(k => (
+              <th key={`t${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>T{k}+</th>
+            ))}
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>PassT(s)</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>Trench</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>Bump</th>
+            <th style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>EG Climb</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ team_number, entries }) => (
+            <tr key={team_number} style={{ borderBottom: '1px solid var(--border)' }}>
+              <td style={{ padding: '0.5rem 0.4rem', fontWeight: 600 }}>{team_number}</td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>{entries.length}</td>
+              {PRESCOUT_CYCLE_KEYS.map(k => (
+                <td key={`a${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                  {avg(entries.map(e => e[`auto_${k}_cycles`]))}
+                </td>
+              ))}
+              {PRESCOUT_CYCLE_KEYS.map(k => (
+                <td key={`t${k}`} style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                  {avg(entries.map(e => e[`teleop_${k}_cycles`]))}
+                </td>
+              ))}
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.map(e => e.total_pass_time))}
+              </td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.map(e => e.trench_count))}
+              </td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.map(e => e.bump_count))}
+              </td>
+              <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                {avg(entries.filter(e => e.endgame_climb_level).map(e => e.endgame_climb_level))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

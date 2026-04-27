@@ -1,7 +1,7 @@
 import { openDB } from 'idb'
 
 const DB_NAME = 'beanscout'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const OPERATION_TIMEOUT = 10000 // 10 seconds timeout for database operations
 
 let dbPromise = null
@@ -57,6 +57,15 @@ async function getDB() {
             store.createIndex('by_synced', 'synced')
             store.createIndex('by_scouter', 'scouter_name')
             store.createIndex('by_event', 'event_key')
+          }
+        }
+        if (oldVersion < 4) {
+          if (!db.objectStoreNames.contains('prescouting')) {
+            console.log('[IndexedDB] Creating prescouting store')
+            const store = db.createObjectStore('prescouting', { keyPath: 'id' })
+            store.createIndex('by_synced', 'synced')
+            store.createIndex('by_event', 'event_key')
+            store.createIndex('by_team', 'team_number')
           }
         }
         console.log('[IndexedDB] Upgrade complete')
@@ -165,12 +174,13 @@ export async function markTeamNoteSynced(id) {
 }
 
 export async function getUnsyncedCount() {
-  const [qual, notes, picklists] = await Promise.all([
+  const [qual, notes, picklists, prescout] = await Promise.all([
     getUnsyncedQualEntries(),
     getUnsyncedTeamNotes(),
     getUnsyncedPicklists(),
+    getUnsyncedPrescoutingEntries(),
   ])
-  return qual.length + notes.length + picklists.length
+  return qual.length + notes.length + picklists.length + prescout.length
 }
 
 // Picklist functions
@@ -221,4 +231,28 @@ export async function getQualEntriesByEvent(eventKey) {
 export async function getAllPicklists() {
   const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for get all picklists')
   return withTimeout(db.getAll('picklists'), OPERATION_TIMEOUT, 'get all picklists')
+}
+
+// Prescouting functions
+export async function savePrescoutingEntry(entry) {
+  console.log('[IndexedDB] Saving prescouting entry:', entry.id)
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for prescouting entry save')
+  return withTimeout(db.put('prescouting', entry), OPERATION_TIMEOUT, 'save prescouting entry')
+}
+
+export async function getUnsyncedPrescoutingEntries() {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for unsynced prescouting entries')
+  const allEntries = await withTimeout(db.getAll('prescouting'), OPERATION_TIMEOUT, 'get all prescouting entries')
+  return allEntries.filter(entry => !entry.synced)
+}
+
+export async function markPrescoutingEntrySynced(id) {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for mark prescouting entry synced')
+  const entry = await withTimeout(db.get('prescouting', id), OPERATION_TIMEOUT, 'get prescouting entry for sync mark')
+  if (entry) await withTimeout(db.put('prescouting', { ...entry, synced: true }), OPERATION_TIMEOUT, 'mark prescouting entry synced')
+}
+
+export async function getPrescoutingEntriesByEvent(eventKey) {
+  const db = await withTimeout(getDB(), OPERATION_TIMEOUT, 'getDB for prescouting entries by event')
+  return withTimeout(db.getAllFromIndex('prescouting', 'by_event', eventKey), OPERATION_TIMEOUT, 'get prescouting entries by event')
 }
