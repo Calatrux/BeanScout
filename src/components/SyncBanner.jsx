@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getUnsyncedCount, getUnsyncedQualEntries, getUnsyncedTeamNotes, getUnsyncedPicklists, markQualEntrySynced, markTeamNoteSynced, markPicklistSynced, getUnsyncedPrescoutingEntries, markPrescoutingEntrySynced } from '@/lib/indexeddb'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 export default function SyncBanner() {
+  const { user } = useAuth()
   const [count, setCount] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -66,34 +68,18 @@ export default function SyncBanner() {
     }
   }, [refreshCount])
 
-  const ensureAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) return true
-    console.log('[SyncBanner] No session, attempting auto-login for sync...')
-    const { error } = await supabase.auth.signInWithPassword({
-      email: 'Braftedr@gmail.com',
-      password: 'Hello123',
-    })
-    if (error) {
-      console.error('[SyncBanner] Auto-login failed:', error.message)
-      return false
-    }
-    console.log('[SyncBanner] Auto-login succeeded')
-    return true
-  }
-
   const handleSync = async () => {
+    if (!user) {
+      setSyncError('Sign in to sync')
+      return
+    }
+
     setSyncing(true)
     setSyncError(null)
     let successCount = 0
     let failCount = 0
 
     try {
-      if (!await ensureAuth()) {
-        setSyncError('Login failed')
-        setSyncing(false)
-        return
-      }
       console.log('[SyncBanner] Starting sync...')
       const [qualEntries, teamNotes, picklists, prescoutingEntries] = await Promise.all([
         getUnsyncedQualEntries(),
@@ -210,7 +196,7 @@ export default function SyncBanner() {
             {count} pending
             {syncError && <span className="sync-error"> ({syncError})</span>}
           </span>
-          <button className="sync-btn" onClick={handleSync} disabled={syncing || isOffline}>
+          <button className="sync-btn" onClick={handleSync} disabled={syncing || isOffline || !user}>
             {syncing ? 'Syncing...' : 'Sync'}
           </button>
         </>

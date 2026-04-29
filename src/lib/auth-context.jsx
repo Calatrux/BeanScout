@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { debugLog } from '@/lib/debug'
 
 const AuthContext = createContext({
   user: null,
@@ -11,46 +10,32 @@ const AuthContext = createContext({
   signOut: async () => {},
 })
 
-// If loading takes longer than this, assume the session is stuck and clear it
-const AUTH_TIMEOUT_MS = 4000
+// Belt-and-suspenders: if auth hasn't resolved by this point, unblock the UI.
+// The real fix for hangs is the custom lock in supabase.js; this is a last resort.
+const AUTH_TIMEOUT_MS = 5000
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const timeoutRef = useRef(null)
+  const loadingDone = useRef(false)
 
   const finishLoading = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
-    }
+    if (loadingDone.current) return
+    loadingDone.current = true
     setLoading(false)
   }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    debugLog('AuthProvider', 'Starting auth initialization')
-
-    // Escape hatch: if we're still loading after AUTH_TIMEOUT_MS, the session
-    // is likely stuck (e.g. a stale Supabase auth lock in localStorage).
-    // Force-clear it so the user can sign in again without manually clearing storage.
-    timeoutRef.current = setTimeout(() => {
-      console.warn('[Auth] Session stuck — force-clearing auth state')
-      supabase.auth.signOut().catch(() => {})
-      setUser(null)
-      setProfile(null)
-      setLoading(false)
+    const timeout = setTimeout(() => {
+      console.warn('[Auth] Auth init timed out — unblocking UI')
+      finishLoading()
     }, AUTH_TIMEOUT_MS)
 
-    // onAuthStateChange fires INITIAL_SESSION on startup, so we don't need a
-    // separate getSession() call. Using both causes fetchProfile() to run twice
-    // simultaneously, which is a race condition that leaves loading=true.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        debugLog('AuthProvider', 'Auth state changed', { event })
-
         if (!session?.user) {
           setUser(null)
           setProfile(null)
@@ -58,8 +43,7 @@ export function AuthProvider({ children }) {
           return
         }
 
-        // Token refresh just rotates the JWT — user and profile haven't changed,
-        // so skip the unnecessary DB round-trip.
+        // Token refresh just rotates the JWT — skip unnecessary profile re-fetch
         if (event === 'TOKEN_REFRESHED') {
           setUser(session.user)
           finishLoading()
@@ -68,18 +52,17 @@ export function AuthProvider({ children }) {
 
         setUser(session.user)
         await fetchProfile(session.user.id)
+        finishLoading()
       }
     )
 
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
   }, [])
 
   const fetchProfile = async (userId) => {
-    debugLog('AuthProvider', 'Fetching profile for userId:', userId)
-
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -87,43 +70,35 @@ export function AuthProvider({ children }) {
         .eq('id', userId)
         .single()
 
-      if (error) {
-        // RLS recursion — retrying won't help
-        if (error.code === '42P17') {
-          console.error('[Auth] RLS policy recursion detected. Check Supabase policies.')
-          finishLoading()
-          return
-        }
-
-        // Profile might not exist yet (trigger delay) — retry once after 1s
-        console.log('[Auth] Profile not found, retrying in 1s...')
-        await new Promise(resolve => setTimeout(resolve, 1000))
-
-        const { data: retryData, error: retryError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single()
-
-        if (!retryError && retryData) {
-          setProfile(retryData)
-        } else {
-          console.error('[Auth] Profile retry failed:', retryError)
-        }
-        finishLoading()
+      if (!error && data) {
+        setProfile(data)
         return
       }
 
-      setProfile(data)
-      finishLoading()
+      if (error?.code === '42P17') {
+        console.error('[Auth] RLS policy recursion detected — check Supabase policies')
+        return
+      }
+
+      // Profile might not exist yet if the DB trigger is slow — retry once
+      await new Promise(r => setTimeout(r, 1000))
+      const { data: retryData, error: retryError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (!retryError && retryData) {
+        setProfile(retryData)
+      } else if (retryError) {
+        console.error('[Auth] Profile fetch failed:', retryError.message)
+      }
     } catch (err) {
-      console.error('[Auth] Unexpected error fetching profile:', err)
-      finishLoading()
+      console.error('[Auth] Unexpected profile fetch error:', err)
     }
   }
 
   const signOut = async () => {
-    // Reset state immediately so the UI is responsive even if the network call hangs
     setUser(null)
     setProfile(null)
     try {
@@ -131,7 +106,6 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('[Auth] Sign out error (non-fatal):', err)
     }
-    // Clear everything — Supabase session tokens, bs_* keys, any stuck auth locks
     localStorage.clear()
   }
 
