@@ -7,8 +7,23 @@ import { getEventMatches, getEventInfo, getEventTeams } from '@/lib/tba'
 import { getCachedEventData, cacheEventData } from '@/lib/tba-cache'
 import { useAuth } from '@/lib/auth-context'
 
+const DEFENSE_EFFECTIVENESS = [
+  { value: 'minimal', label: 'Minimal' },
+  { value: 'decent', label: 'Decent' },
+  { value: 'impactful', label: 'Impactful' },
+  { value: 'shutdown', label: 'Shutdown' },
+]
+
 function makeTeams(numbers) {
-  return numbers.map((num) => ({ number: num, notes: '', isUpdate: false, noChange: false }))
+  return numbers.map((num) => ({
+    number: num,
+    notes: '',
+    isUpdate: false,
+    noChange: false,
+    playedDefense: false,
+    defenseEffectiveness: null,
+    starred: false,
+  }))
 }
 
 export default function TeamNotesForm() {
@@ -147,6 +162,9 @@ export default function TeamNotesForm() {
           match_number: matchNum,
           note: team.notes.trim(),
           is_update: team.isUpdate,
+          played_defense: team.playedDefense,
+          defense_effectiveness: team.playedDefense ? team.defenseEffectiveness : null,
+          starred: team.starred || false,
           scouter_name: scouterName,
           created_at: new Date().toISOString(),
           synced: false,
@@ -288,6 +306,16 @@ export default function TeamNotesForm() {
             >
               <div className="team-header">
                 <span className="team-number">{team.number}</span>
+                <button
+                  type="button"
+                  className={`star-btn${team.starred ? ' active' : ''}`}
+                  onClick={() => updateFlag(index, 'starred', !team.starred)}
+                  aria-label={`Star team ${team.number}`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={team.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                  </svg>
+                </button>
                 <div className="team-status-buttons">
                   <label className="status-checkbox-label">
                     <input
@@ -316,6 +344,38 @@ export default function TeamNotesForm() {
                   rows={4}
                 />
               )}
+
+              {/* Defense tracking */}
+              <div className="defense-section">
+                <button
+                  type="button"
+                  className={`defense-toggle-btn${team.playedDefense ? ' active' : ''}`}
+                  onClick={() => {
+                    updateFlag(index, 'playedDefense', !team.playedDefense)
+                    if (team.playedDefense) updateFlag(index, 'defenseEffectiveness', null)
+                  }}
+                >
+                  {team.playedDefense ? '🛡 Played Defense' : '🛡 Played Defense?'}
+                </button>
+                {team.playedDefense && (
+                  <div className="defense-effectiveness-row">
+                    <span className="defense-effectiveness-label">How effective?</span>
+                    <div className="defense-effectiveness-buttons">
+                      {DEFENSE_EFFECTIVENESS.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          data-value={value}
+                          className={`defense-effectiveness-btn${team.defenseEffectiveness === value ? ' active' : ''}`}
+                          onClick={() => updateFlag(index, 'defenseEffectiveness', team.defenseEffectiveness === value ? null : value)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>

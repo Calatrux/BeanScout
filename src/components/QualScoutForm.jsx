@@ -53,6 +53,12 @@ function detectZone(point, alliance) {
   return { position: null, label: null }
 }
 
+const SKILL_RANKINGS = [
+  { key: 'agilityRank', label: 'Agility' },
+  { key: 'fieldAwarenessRank', label: 'Field Awareness' },
+  { key: 'driverAbilityRank', label: 'Driver Ability' },
+]
+
 function makeTeams(numbers) {
   return numbers.map((num) => ({
     number: num,
@@ -64,6 +70,10 @@ function makeTeams(numbers) {
     crossesMidline: false,
     startingPosition: null,
     endLocation: null,
+    agilityRank: null,
+    fieldAwarenessRank: null,
+    driverAbilityRank: null,
+    starred: false,
   }))
 }
 
@@ -278,6 +288,13 @@ export default function QualScoutForm() {
     setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, crossesMidline: value } : t)))
   }
 
+  const updateRanking = (rankKey, teamIndex, rank) => {
+    setTeams((prev) => prev.map((t, i) => {
+      if (i !== teamIndex) return t
+      return { ...t, [rankKey]: t[rankKey] === rank ? null : rank }
+    }))
+  }
+
   const toggleTagCategory = (category) => {
     setExpandedTagCategory(expandedTagCategory === category ? null : category)
   }
@@ -390,6 +407,10 @@ export default function QualScoutForm() {
         team1_crosses_midline: teams[0].crossesMidline || false,
         team1_starting_position: teams[0].startingPosition ?? null,
         team1_end_location: teams[0].endLocation ?? null,
+        team1_agility_rank: teams[0].agilityRank ?? null,
+        team1_field_awareness_rank: teams[0].fieldAwarenessRank ?? null,
+        team1_driver_ability_rank: teams[0].driverAbilityRank ?? null,
+        team1_starred: teams[0].starred || false,
         team2_number: teams[1].number,
         team2_notes: teams[1].notes,
         team2_no_show: teams[1].noShow,
@@ -399,6 +420,10 @@ export default function QualScoutForm() {
         team2_crosses_midline: teams[1].crossesMidline || false,
         team2_starting_position: teams[1].startingPosition ?? null,
         team2_end_location: teams[1].endLocation ?? null,
+        team2_agility_rank: teams[1].agilityRank ?? null,
+        team2_field_awareness_rank: teams[1].fieldAwarenessRank ?? null,
+        team2_driver_ability_rank: teams[1].driverAbilityRank ?? null,
+        team2_starred: teams[1].starred || false,
         team3_number: teams[2].number,
         team3_notes: teams[2].notes,
         team3_no_show: teams[2].noShow,
@@ -408,6 +433,10 @@ export default function QualScoutForm() {
         team3_crosses_midline: teams[2].crossesMidline || false,
         team3_starting_position: teams[2].startingPosition ?? null,
         team3_end_location: teams[2].endLocation ?? null,
+        team3_agility_rank: teams[2].agilityRank ?? null,
+        team3_field_awareness_rank: teams[2].fieldAwarenessRank ?? null,
+        team3_driver_ability_rank: teams[2].driverAbilityRank ?? null,
+        team3_starred: teams[2].starred || false,
         scouter_name: scouterName,
         created_at: new Date().toISOString(),
         synced: false,
@@ -588,6 +617,16 @@ export default function QualScoutForm() {
                 </span>
                 <span className={`rank-badge rank-${index + 1}`}>#{index + 1}</span>
                 <span className="team-number">{team.number}</span>
+                <button
+                  type="button"
+                  className={`star-btn${team.starred ? ' active' : ''}`}
+                  onClick={() => updateTeamFlag(index, 'starred', !team.starred)}
+                  aria-label={`Star team ${team.number}`}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={team.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                  </svg>
+                </button>
                 <div className="team-status-buttons">
                   <button
                     type="button"
@@ -655,6 +694,35 @@ export default function QualScoutForm() {
                   alliance={alliance}
                   historyPaths={prevPaths[team.number] || []}
                 />
+              </div>
+
+              {/* Skill Rankings */}
+              <div className="skill-rankings-section">
+                <span className="skill-rankings-title">Skill Rankings</span>
+                {SKILL_RANKINGS.map(({ key, label }) => (
+                  <div key={key} className="skill-rank-row">
+                    <span className="skill-rank-label">{label}</span>
+                    <div className="skill-rank-buttons">
+                      {[1, 2, 3].map((rank) => {
+                        const takenByOther = teams.some((t, i) => i !== index && t[key] === rank)
+                        const isActive = team[key] === rank
+                        return (
+                          <button
+                            key={rank}
+                            type="button"
+                            className={`rank-select-btn${isActive ? ` active rank-${rank}` : ''}${takenByOther ? ' taken' : ''}`}
+                            onClick={() => !takenByOther && updateRanking(key, index, rank)}
+                            disabled={takenByOther}
+                            title={takenByOther ? 'Already assigned to another team' : rank === 1 ? 'Best in alliance' : rank === 2 ? 'Middle' : 'Weakest in alliance'}
+                            aria-label={`Rank ${rank} for ${label}${takenByOther ? ' (taken)' : ''}`}
+                          >
+                            {rank}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Characterization Tags */}

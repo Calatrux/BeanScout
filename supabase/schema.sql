@@ -102,6 +102,27 @@ CREATE INDEX idx_prescouting_match ON prescouting (event_key, match_number);
 -- Alliance column (run if table already exists)
 ALTER TABLE prescouting ADD COLUMN IF NOT EXISTS alliance TEXT CHECK (alliance IN ('red', 'blue'));
 
+-- Skill rankings for qual_scouting (1=best, 3=worst, relative within alliance)
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team1_agility_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team2_agility_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team3_agility_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team1_field_awareness_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team2_field_awareness_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team3_field_awareness_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team1_driver_ability_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team2_driver_ability_rank SMALLINT;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team3_driver_ability_rank SMALLINT;
+
+-- Defense tracking for team_notes
+ALTER TABLE team_notes ADD COLUMN IF NOT EXISTS played_defense BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE team_notes ADD COLUMN IF NOT EXISTS defense_effectiveness TEXT CHECK (defense_effectiveness IN ('minimal', 'decent', 'impactful', 'shutdown'));
+
+-- Starred teams (notable/flagged for attention)
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team1_starred BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team2_starred BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE qual_scouting ADD COLUMN IF NOT EXISTS team3_starred BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE team_notes ADD COLUMN IF NOT EXISTS starred BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- RLS for prescouting
 ALTER TABLE prescouting ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Authenticated users can insert prescouting"

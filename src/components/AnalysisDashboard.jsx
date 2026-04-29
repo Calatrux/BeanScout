@@ -58,6 +58,13 @@ export default function AnalysisDashboard() {
 
   const isAdmin = profile?.is_admin
 
+  const skillColor = (avg) => {
+    if (avg == null) return ''
+    if (avg <= 1.5) return 'sv-1'
+    if (avg <= 2.3) return 'sv-2'
+    return 'sv-3'
+  }
+
   // Get active team picklist
   const activePicklist = teamPicklists.find(p => p.id === activePicklistId)
 
@@ -247,21 +254,29 @@ export default function AnalysisDashboard() {
         rankCount: 0,
         rankings: [],
         tagCounts: {},
+        starCount: 0,
+        agilityRankSum: 0, agilityRankCount: 0,
+        fieldAwarenessRankSum: 0, fieldAwarenessRankCount: 0,
+        driverAbilityRankSum: 0, driverAbilityRankCount: 0,
       }
     })
 
     // Process qual scouting entries
     qualData.forEach(entry => {
       const teams = [
-        { number: entry.team1_number, notes: entry.team1_notes, rank: 1, noShow: entry.team1_no_show, incap: entry.team1_incap, tags: entry.team1_tags, path: entry.team1_path || [], crossesMidline: entry.team1_crosses_midline || false },
-        { number: entry.team2_number, notes: entry.team2_notes, rank: 2, noShow: entry.team2_no_show, incap: entry.team2_incap, tags: entry.team2_tags, path: entry.team2_path || [], crossesMidline: entry.team2_crosses_midline || false },
-        { number: entry.team3_number, notes: entry.team3_notes, rank: 3, noShow: entry.team3_no_show, incap: entry.team3_incap, tags: entry.team3_tags, path: entry.team3_path || [], crossesMidline: entry.team3_crosses_midline || false },
+        { number: entry.team1_number, notes: entry.team1_notes, rank: 1, noShow: entry.team1_no_show, incap: entry.team1_incap, tags: entry.team1_tags, path: entry.team1_path || [], crossesMidline: entry.team1_crosses_midline || false, starred: entry.team1_starred || false, agilityRank: entry.team1_agility_rank ?? null, fieldAwarenessRank: entry.team1_field_awareness_rank ?? null, driverAbilityRank: entry.team1_driver_ability_rank ?? null },
+        { number: entry.team2_number, notes: entry.team2_notes, rank: 2, noShow: entry.team2_no_show, incap: entry.team2_incap, tags: entry.team2_tags, path: entry.team2_path || [], crossesMidline: entry.team2_crosses_midline || false, starred: entry.team2_starred || false, agilityRank: entry.team2_agility_rank ?? null, fieldAwarenessRank: entry.team2_field_awareness_rank ?? null, driverAbilityRank: entry.team2_driver_ability_rank ?? null },
+        { number: entry.team3_number, notes: entry.team3_notes, rank: 3, noShow: entry.team3_no_show, incap: entry.team3_incap, tags: entry.team3_tags, path: entry.team3_path || [], crossesMidline: entry.team3_crosses_midline || false, starred: entry.team3_starred || false, agilityRank: entry.team3_agility_rank ?? null, fieldAwarenessRank: entry.team3_field_awareness_rank ?? null, driverAbilityRank: entry.team3_driver_ability_rank ?? null },
       ]
 
-      teams.forEach(({ number, notes, rank, noShow, incap, tags, path, crossesMidline }) => {
+      teams.forEach(({ number, notes, rank, noShow, incap, tags, path, crossesMidline, starred, agilityRank, fieldAwarenessRank, driverAbilityRank }) => {
         if (teamStats[number]) {
           teamStats[number].rankSum += rank
           teamStats[number].rankCount += 1
+          if (starred) teamStats[number].starCount += 1
+          if (agilityRank != null) { teamStats[number].agilityRankSum += agilityRank; teamStats[number].agilityRankCount += 1 }
+          if (fieldAwarenessRank != null) { teamStats[number].fieldAwarenessRankSum += fieldAwarenessRank; teamStats[number].fieldAwarenessRankCount += 1 }
+          if (driverAbilityRank != null) { teamStats[number].driverAbilityRankSum += driverAbilityRank; teamStats[number].driverAbilityRankCount += 1 }
           teamStats[number].rankings.push({
             rank,
             matchNumber: entry.match_number,
@@ -274,6 +289,10 @@ export default function AnalysisDashboard() {
             tags: tags || [],
             path: path || [],
             crossesMidline: crossesMidline || false,
+            starred: starred || false,
+            agilityRank,
+            fieldAwarenessRank,
+            driverAbilityRank,
           })
 
           // Count tags for aggregation
@@ -292,6 +311,9 @@ export default function AnalysisDashboard() {
       .map(team => ({
         ...team,
         avgRank: team.rankSum / team.rankCount,
+        avgAgilityRank: team.agilityRankCount > 0 ? team.agilityRankSum / team.agilityRankCount : null,
+        avgFieldAwarenessRank: team.fieldAwarenessRankCount > 0 ? team.fieldAwarenessRankSum / team.fieldAwarenessRankCount : null,
+        avgDriverAbilityRank: team.driverAbilityRankCount > 0 ? team.driverAbilityRankSum / team.driverAbilityRankCount : null,
       }))
 
     // Apply tag filtering
@@ -319,6 +341,18 @@ export default function AnalysisDashboard() {
           break
         case 'teamName':
           comparison = (a.name || '').localeCompare(b.name || '')
+          break
+        case 'starCount':
+          comparison = b.starCount - a.starCount
+          break
+        case 'avgAgilityRank':
+          comparison = (a.avgAgilityRank ?? 99) - (b.avgAgilityRank ?? 99)
+          break
+        case 'avgFieldAwarenessRank':
+          comparison = (a.avgFieldAwarenessRank ?? 99) - (b.avgFieldAwarenessRank ?? 99)
+          break
+        case 'avgDriverAbilityRank':
+          comparison = (a.avgDriverAbilityRank ?? 99) - (b.avgDriverAbilityRank ?? 99)
           break
         default:
           comparison = a.avgRank - b.avgRank
@@ -766,6 +800,10 @@ export default function AnalysisDashboard() {
                                 >
                                   <option value="avgRank">Average Rank</option>
                                   <option value="observations">Number of Observations</option>
+                                  <option value="starCount">Star Count</option>
+                                  <option value="avgAgilityRank">Avg Agility Rank</option>
+                                  <option value="avgFieldAwarenessRank">Avg Field Awareness Rank</option>
+                                  <option value="avgDriverAbilityRank">Avg Driver Ability Rank</option>
                                   <option value="teamNumber">Team Number</option>
                                   <option value="teamName">Team Name</option>
                                 </select>
@@ -825,6 +863,18 @@ export default function AnalysisDashboard() {
                                 <span className="analysis-team-count">
                                   {team.rankCount} obs
                                 </span>
+                                {team.starCount > 0 && (
+                                  <span className="analysis-star-count" title={`Starred ${team.starCount} time(s)`}>
+                                    ★ {team.starCount}
+                                  </span>
+                                )}
+                                {(team.avgAgilityRank != null || team.avgFieldAwarenessRank != null || team.avgDriverAbilityRank != null) && (
+                                  <span className="analysis-skill-summary">
+                                    {team.avgAgilityRank != null && <span className={skillColor(team.avgAgilityRank)} title="Avg Agility Rank">A:{team.avgAgilityRank.toFixed(1)}</span>}
+                                    {team.avgFieldAwarenessRank != null && <span className={skillColor(team.avgFieldAwarenessRank)} title="Avg Field Awareness Rank">F:{team.avgFieldAwarenessRank.toFixed(1)}</span>}
+                                    {team.avgDriverAbilityRank != null && <span className={skillColor(team.avgDriverAbilityRank)} title="Avg Driver Ability Rank">D:{team.avgDriverAbilityRank.toFixed(1)}</span>}
+                                  </span>
+                                )}
                                 {/* Show top 2 most frequent tags */}
                                 {Object.keys(team.tagCounts || {}).length > 0 && (
                                   <div className="analysis-team-tags">
@@ -846,98 +896,141 @@ export default function AnalysisDashboard() {
                               </span>
                             </div>
 
-                            {expandedTeam === team.number && (
-                              <div className="analysis-team-content">
-                                {/* Ranking Notes */}
-                                <div className="notes-section">
-                                  <div className="notes-section-title">
-                                    Ranking Notes
-                                    <span className="notes-section-count">({team.rankings.length})</span>
-                                  </div>
-                                  {team.rankings.length === 0 ? (
-                                    <div className="notes-empty">No ranking notes</div>
-                                  ) : (
-                                    team.rankings.map((r, i) => (
-                                      <div key={i} className="note-card">
-                                        <div className="note-card-header">
-                                          <span className={`note-card-rank rank-${r.rank}`}>
-                                            Rank #{r.rank}
-                                          </span>
-                                          <div className="note-card-meta">
-                                            <span>Match {r.matchNumber}</span>
-                                            <span className={`alliance-badge ${r.alliance}`}>
-                                              {r.alliance}
-                                            </span>
-                                            {r.noShow && (
-                                              <span className="flag-badge no-show">No-Show</span>
-                                            )}
-                                            {r.incap && (
-                                              <span className="flag-badge incap">Incap</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        {r.notes ? (
-                                          <div className="note-card-text">{r.notes}</div>
-                                        ) : (
-                                          <div className="note-card-text empty">No notes provided</div>
-                                        )}
-                                        {r.tags && r.tags.length > 0 && (
-                                          <div className="note-card-tags">
-                                            {r.tags.map(tag => (
-                                              <span key={tag} className="note-tag">
-                                                {tag}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        )}
-                                        <div className="note-card-footer">
-                                          {r.scouter}
-                                        </div>
-                                        {r.crossesMidline && (
-                                          <span className="midline-badge">Crosses Midline</span>
-                                        )}
+                            {expandedTeam === team.number && (() => {
+                              const tnotes = getTeamNotes(team.number)
+                              const defNotes = tnotes.filter(n => n.played_defense)
+                              const defEffCounts = defNotes.reduce((acc, n) => {
+                                if (n.defense_effectiveness) acc[n.defense_effectiveness] = (acc[n.defense_effectiveness] || 0) + 1
+                                return acc
+                              }, {})
+                              const EFF_ORDER = ['minimal', 'decent', 'impactful', 'shutdown']
+                              return (
+                                <div className="analysis-team-content">
+                                  {/* Quick stats summary */}
+                                  <div className="team-quick-stats">
+                                    {team.starCount > 0 && (
+                                      <div className="quick-stat starred">
+                                        <span className="quick-stat-label">Starred</span>
+                                        <span className="quick-stat-value">★ {team.starCount}</span>
                                       </div>
-                                    ))
-                                  )}
-                                </div>
+                                    )}
+                                    {team.avgAgilityRank != null && (
+                                      <div className="quick-stat">
+                                        <span className="quick-stat-label">Agility</span>
+                                        <span className={`quick-stat-value rank-val-${Math.round(team.avgAgilityRank)}`}>{team.avgAgilityRank.toFixed(1)}</span>
+                                      </div>
+                                    )}
+                                    {team.avgFieldAwarenessRank != null && (
+                                      <div className="quick-stat">
+                                        <span className="quick-stat-label">Field Aware</span>
+                                        <span className={`quick-stat-value rank-val-${Math.round(team.avgFieldAwarenessRank)}`}>{team.avgFieldAwarenessRank.toFixed(1)}</span>
+                                      </div>
+                                    )}
+                                    {team.avgDriverAbilityRank != null && (
+                                      <div className="quick-stat">
+                                        <span className="quick-stat-label">Driver</span>
+                                        <span className={`quick-stat-value rank-val-${Math.round(team.avgDriverAbilityRank)}`}>{team.avgDriverAbilityRank.toFixed(1)}</span>
+                                      </div>
+                                    )}
+                                    {defNotes.length > 0 && (
+                                      <div className="quick-stat defense">
+                                        <span className="quick-stat-label">Defense</span>
+                                        <span className="quick-stat-value">
+                                          {defNotes.length}x
+                                          {EFF_ORDER.filter(e => defEffCounts[e]).map(e => (
+                                            <span key={e} className={`defense-eff-mini ${e}`}>{defEffCounts[e]} {e}</span>
+                                          ))}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
 
-                                {/* Team Notes */}
-                                <div className="notes-section">
-                                  <div className="notes-section-title">
-                                    Team Notes
-                                    <span className="notes-section-count">
-                                      ({getTeamNotes(team.number).length})
-                                    </span>
-                                  </div>
-                                  {getTeamNotes(team.number).length === 0 ? (
-                                    <div className="notes-empty">No team notes recorded</div>
-                                  ) : (
-                                    getTeamNotes(team.number).map((note) => (
-                                      <div
-                                        key={note.id}
-                                        className={`note-card${note.is_update ? ' is-update' : ''}`}
-                                      >
-                                        <div className="note-card-header">
-                                          {note.is_update && (
-                                            <span className="update-badge">Update</span>
+                                  {/* Ranking Notes */}
+                                  <div className="notes-section">
+                                    <div className="notes-section-title">
+                                      Qual Scouting
+                                      <span className="notes-section-count">({team.rankings.length})</span>
+                                    </div>
+                                    {team.rankings.length === 0 ? (
+                                      <div className="notes-empty">No ranking notes</div>
+                                    ) : (
+                                      team.rankings.map((r, i) => (
+                                        <div key={i} className={`note-card${r.starred ? ' starred-card' : ''}`}>
+                                          <div className="note-card-header">
+                                            <span className={`note-card-rank rank-${r.rank}`}>
+                                              #{r.rank}
+                                            </span>
+                                            {r.starred && <span className="star-badge">★</span>}
+                                            <div className="note-card-meta">
+                                              <span>Match {r.matchNumber}</span>
+                                              <span className={`alliance-badge ${r.alliance}`}>{r.alliance}</span>
+                                              {r.noShow && <span className="flag-badge no-show">No-Show</span>}
+                                              {r.incap && <span className="flag-badge incap">Incap</span>}
+                                              {r.crossesMidline && <span className="flag-badge midline">↔ Midline</span>}
+                                            </div>
+                                          </div>
+                                          {(r.agilityRank != null || r.fieldAwarenessRank != null || r.driverAbilityRank != null) && (
+                                            <div className="note-skill-ranks">
+                                              {r.agilityRank != null && <span className={`skill-rank-badge rank-${r.agilityRank}`}>Agility #{r.agilityRank}</span>}
+                                              {r.fieldAwarenessRank != null && <span className={`skill-rank-badge rank-${r.fieldAwarenessRank}`}>Field Aware #{r.fieldAwarenessRank}</span>}
+                                              {r.driverAbilityRank != null && <span className={`skill-rank-badge rank-${r.driverAbilityRank}`}>Driver #{r.driverAbilityRank}</span>}
+                                            </div>
                                           )}
-                                          <div className="note-card-meta">
-                                            {note.match_number && (
-                                              <span>Match {note.match_number}</span>
+                                          {r.notes ? (
+                                            <div className="note-card-text">{r.notes}</div>
+                                          ) : (
+                                            <div className="note-card-text empty">No notes provided</div>
+                                          )}
+                                          {r.tags && r.tags.length > 0 && (
+                                            <div className="note-card-tags">
+                                              {r.tags.map(tag => (
+                                                <span key={tag} className="note-tag">{tag}</span>
+                                              ))}
+                                            </div>
+                                          )}
+                                          <div className="note-card-footer">{r.scouter}</div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+
+                                  {/* Team Notes */}
+                                  <div className="notes-section">
+                                    <div className="notes-section-title">
+                                      Team Notes
+                                      <span className="notes-section-count">({tnotes.length})</span>
+                                    </div>
+                                    {tnotes.length === 0 ? (
+                                      <div className="notes-empty">No team notes recorded</div>
+                                    ) : (
+                                      tnotes.map((note) => (
+                                        <div
+                                          key={note.id}
+                                          className={`note-card${note.is_update ? ' is-update' : ''}${note.starred ? ' starred-card' : ''}`}
+                                        >
+                                          <div className="note-card-header">
+                                            {note.starred && <span className="star-badge">★</span>}
+                                            {note.is_update && <span className="update-badge">Update</span>}
+                                            {note.played_defense && (
+                                              <span className={`defense-badge${note.defense_effectiveness ? ` eff-${note.defense_effectiveness}` : ''}`}>
+                                                🛡 {note.defense_effectiveness ? note.defense_effectiveness.charAt(0).toUpperCase() + note.defense_effectiveness.slice(1) : 'Defense'}
+                                              </span>
                                             )}
+                                            <div className="note-card-meta">
+                                              {note.match_number && <span>Match {note.match_number}</span>}
+                                            </div>
+                                          </div>
+                                          {note.note && <div className="note-card-text">{note.note}</div>}
+                                          <div className="note-card-footer">
+                                            {note.scouter_name} &middot; {new Date(note.created_at).toLocaleString()}
                                           </div>
                                         </div>
-                                        <div className="note-card-text">{note.note}</div>
-                                        <div className="note-card-footer">
-                                          {note.scouter_name} &middot;{' '}
-                                          {new Date(note.created_at).toLocaleString()}
-                                        </div>
-                                      </div>
-                                    ))
-                                  )}
+                                      ))
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )
+                            })()}
                           </div>
                         ))}
                       </div>
